@@ -128,7 +128,6 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./postgres/init:/docker-entrypoint-initdb.d:ro
-      - ./public.sql:/docker-entrypoint-initdb.d/001-public.sql:ro
     networks:
       - xiaomai-net
     healthcheck:
