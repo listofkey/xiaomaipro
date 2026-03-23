@@ -19,11 +19,14 @@ FROM alpine:3.22
 
 WORKDIR /app
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates gettext tzdata
 
 COPY --from=builder /out/service /app/service
-COPY server/deploy/config /app/config
+COPY deploy/docker/backend-entrypoint.sh /app/entrypoint.sh
+COPY server/deploy/config /app/config-templates
 
 ENV TZ=Asia/Shanghai
 
-ENTRYPOINT ["/app/service"]
+RUN chmod +x /app/entrypoint.sh
+
+ENTRYPOINT ["/app/entrypoint.sh"]

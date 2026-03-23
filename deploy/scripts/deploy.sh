@@ -5,7 +5,10 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/deploy/.env"
 COMPOSE_FILE="$ROOT_DIR/deploy/docker-compose.prod.yml"
+POSTGRES_BOOTSTRAP_SCRIPT="$ROOT_DIR/deploy/scripts/bootstrap-postgres.sh"
 APP_SERVICES=(proxy gateway user-rpc program-rpc payment-rpc order-rpc)
+INFRA_SERVICES=(etcd postgres redis rabbitmq kafka kafka-init)
+CORE_APP_SERVICES=(gateway user-rpc program-rpc payment-rpc order-rpc proxy)
 
 cd "$ROOT_DIR"
 
@@ -26,4 +29,6 @@ fi
 echo "Deploying images from ${DOCKERHUB_NAMESPACE:-deploy/.env} with tag ${APP_IMAGE_TAG}"
 
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull "${APP_SERVICES[@]}"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans "${INFRA_SERVICES[@]}"
+bash "$POSTGRES_BOOTSTRAP_SCRIPT"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans "${CORE_APP_SERVICES[@]}"
