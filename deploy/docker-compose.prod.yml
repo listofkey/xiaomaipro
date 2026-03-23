@@ -14,7 +14,7 @@ services:
       gateway:
         condition: service_started
     ports:
-      - "${APP_HTTP_PORT:-80}:80"
+      - "${APP_HTTP_BIND_IP:-0.0.0.0}:${APP_HTTP_PORT:-80}:80"
     restart: unless-stopped
     networks:
       - xiaomai-net

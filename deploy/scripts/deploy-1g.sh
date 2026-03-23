@@ -5,8 +5,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/deploy/.env"
 EXAMPLE_ENV_FILE="$ROOT_DIR/deploy/.env.example"
-COMPOSE_FILE="$ROOT_DIR/deploy/docker-compose.prod.yml"
-OVERRIDE_FILE="$ROOT_DIR/deploy/docker-compose.1g.yml"
+COMPOSE_FILE="$ROOT_DIR/deploy/docker-compose.1g.yml"
 APP_SERVICES=(proxy gateway user-rpc program-rpc payment-rpc order-rpc etcd postgres redis)
 
 cd "$ROOT_DIR"
@@ -27,5 +26,5 @@ fi
 
 echo "Deploying 1G profile from ${DOCKERHUB_NAMESPACE:-deploy/.env} with tag ${APP_IMAGE_TAG}"
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" pull "${APP_SERVICES[@]}"
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" -f "$OVERRIDE_FILE" up -d --remove-orphans "${APP_SERVICES[@]}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull "${APP_SERVICES[@]}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans "${APP_SERVICES[@]}"
