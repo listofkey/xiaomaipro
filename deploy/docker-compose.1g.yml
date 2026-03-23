@@ -75,6 +75,8 @@ services:
     <<: *backend-service
     image: ${DOCKERHUB_NAMESPACE}/xiaomaipro-order-rpc:${APP_IMAGE_TAG:-latest}
     command: ["-f", "/app/config/order.yaml"]
+    environment:
+      KAFKA_ENABLED: "false"
     depends_on:
       etcd:
         condition: service_healthy
