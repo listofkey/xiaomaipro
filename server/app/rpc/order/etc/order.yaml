@@ -1,0 +1,46 @@
+Name: order.rpc
+ListenOn: 0.0.0.0:8083
+# PayOrder/Refund 会串联 DB、锁和 payment.rpc，显式放宽服务端超时，
+# 避免 go-zero 的默认 2s timeout 在第三方支付链路上提前触发。
+Timeout: 70000
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: order.rpc
+
+DB:
+  DSN: "host=127.0.0.1 user=root password=123456 dbname=xiaomaipro port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+RedisConfig:
+  Host: 127.0.0.1:6379
+  Password: ""
+  DB: 0
+
+PaymentRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: payment.rpc
+  Timeout: 0
+
+Pay:
+  NotifySuccessResult: "success"
+  MockPayFormTemplate: "mock://pay/{order_no}"
+
+Kafka:
+  Enabled: true
+  Brokers:
+    - 127.0.0.1:9092
+  Topic: "xiaomaipro-order-create"
+  GroupID: "xiaomaipro-order"
+
+Order:
+  PayTimeoutMinutes: 15
+  QueueStatusTTLMinutes: 30
+  InventoryTTLHours: 48
+  PurchaseCounterTTLHours: 48
+  RefundDeadlineHours: 24
+  AutoCancelIntervalSeconds: 30
+  LocalAsyncBuffer: 1024
+
+KeyPrefix: "xiaomaipro:order"

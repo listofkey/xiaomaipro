@@ -1,0 +1,638 @@
+syntax = "v1"
+
+info(
+	title:   "xiaomaipro gateway"
+	desc:    "gateway api"
+	author:  "Codex"
+	email:   "dev@localhost"
+	version: "v1"
+)
+
+type UserInfo {
+	Id         string `json:"id"`
+	Phone      string `json:"phone"`
+	Email      string `json:"email"`
+	Nickname   string `json:"nickname"`
+	Avatar     string `json:"avatar"`
+	Status     int32  `json:"status"`
+	IsVerified bool   `json:"isVerified"`
+	RealName   string `json:"realName,optional"`
+	CreatedAt  string `json:"createdAt"`
+}
+
+type AddressInfo {
+	Id            string `json:"id"`
+	ReceiverName  string `json:"receiverName"`
+	ReceiverPhone string `json:"receiverPhone"`
+	Province      string `json:"province"`
+	City          string `json:"city"`
+	District      string `json:"district"`
+	Detail        string `json:"detail"`
+	IsDefault     bool   `json:"isDefault"`
+	CreatedAt     string `json:"createdAt"`
+}
+
+type TicketBuyerInfo {
+	Id        string `json:"id"`
+	Name      string `json:"name"`
+	IdCard    string `json:"idCard"`
+	Phone     string `json:"phone"`
+	IsDefault bool   `json:"isDefault"`
+	CreatedAt string `json:"createdAt"`
+}
+
+type RegisterReq {
+	Phone    string `json:"phone,optional"`
+	Email    string `json:"email,optional"`
+	Password string `json:"password"`
+	Nickname string `json:"nickname,optional"`
+	Code     string `json:"code,optional"`
+}
+
+type LoginReq {
+	Account  string `json:"account"`
+	Password string `json:"password"`
+}
+
+type RefreshTokenReq {
+	RefreshToken string `json:"refreshToken"`
+}
+
+type LogoutReq {
+	RefreshToken string `json:"refreshToken,optional"`
+}
+
+type AuthPayload {
+	UserId       string   `json:"userId"`
+	AccessToken  string   `json:"accessToken"`
+	RefreshToken string   `json:"refreshToken"`
+	ExpiresIn    int64    `json:"expiresIn"`
+	UserInfo     UserInfo `json:"userInfo"`
+}
+
+type RefreshTokenResp {
+	AccessToken  string `json:"accessToken"`
+	RefreshToken string `json:"refreshToken"`
+	ExpiresIn    int64  `json:"expiresIn"`
+}
+
+type ValidateTokenResp {
+	Valid    bool     `json:"valid"`
+	UserId   string   `json:"userId"`
+	Status   int32    `json:"status"`
+	UserInfo UserInfo `json:"userInfo"`
+}
+
+type OperationResp {
+	Success bool `json:"success"`
+}
+
+type UpdateProfileReq {
+	Nickname string `json:"nickname,optional"`
+	Avatar   string `json:"avatar,optional"`
+	Email    string `json:"email,optional"`
+}
+
+type ChangePasswordReq {
+	OldPassword string `json:"oldPassword"`
+	NewPassword string `json:"newPassword"`
+}
+
+type CreateTicketBuyerReq {
+	Name      string `json:"name"`
+	IdCard    string `json:"idCard,optional"`
+	Phone     string `json:"phone,optional"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+type UpdateTicketBuyerReq {
+	BuyerId   string `json:"buyerId"`
+	Name      string `json:"name,optional"`
+	IdCard    string `json:"idCard,optional"`
+	Phone     string `json:"phone,optional"`
+	IsDefault bool   `json:"isDefault"`
+}
+
+type DeleteTicketBuyerReq {
+	BuyerId string `json:"buyerId"`
+}
+
+type SetDefaultTicketBuyerReq {
+	BuyerId string `json:"buyerId"`
+}
+
+type TicketBuyerResp {
+	TicketBuyer TicketBuyerInfo `json:"ticketBuyer"`
+}
+
+type TicketBuyerListResp {
+	TicketBuyers []TicketBuyerInfo `json:"ticketBuyers"`
+}
+
+type CreateAddressReq {
+	ReceiverName  string `json:"receiverName"`
+	ReceiverPhone string `json:"receiverPhone"`
+	Province      string `json:"province"`
+	City          string `json:"city"`
+	District      string `json:"district"`
+	Detail        string `json:"detail"`
+	IsDefault     bool   `json:"isDefault"`
+}
+
+type UpdateAddressReq {
+	AddressId     string `json:"addressId"`
+	ReceiverName  string `json:"receiverName,optional"`
+	ReceiverPhone string `json:"receiverPhone,optional"`
+	Province      string `json:"province,optional"`
+	City          string `json:"city,optional"`
+	District      string `json:"district,optional"`
+	Detail        string `json:"detail,optional"`
+	IsDefault     bool   `json:"isDefault"`
+}
+
+type DeleteAddressReq {
+	AddressId string `json:"addressId"`
+}
+
+type SetDefaultAddressReq {
+	AddressId string `json:"addressId"`
+}
+
+type AddressResp {
+	Address AddressInfo `json:"address"`
+}
+
+type AddressListResp {
+	Addresses []AddressInfo `json:"addresses"`
+}
+
+type ProgramCategoryInfo {
+	Id        int32  `json:"id"`
+	Name      string `json:"name"`
+	Icon      string `json:"icon"`
+	SortOrder int32  `json:"sortOrder"`
+	Status    int32  `json:"status"`
+}
+
+type ProgramCityInfo {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type ProgramVenueInfo {
+	Id          string `json:"id"`
+	Name        string `json:"name"`
+	City        string `json:"city"`
+	Address     string `json:"address"`
+	Capacity    int32  `json:"capacity"`
+	SeatMapUrl  string `json:"seatMapUrl"`
+	Description string `json:"description"`
+}
+
+type ProgramTicketTierInfo {
+	Id          string  `json:"id"`
+	EventId     string  `json:"eventId"`
+	Name        string  `json:"name"`
+	Price       float64 `json:"price"`
+	TotalStock  int32   `json:"totalStock"`
+	SoldCount   int32   `json:"soldCount"`
+	LockedCount int32   `json:"lockedCount"`
+	Status      int32   `json:"status"`
+	SortOrder   int32   `json:"sortOrder"`
+	RemainStock int32   `json:"remainStock"`
+}
+
+type ProgramEventBrief {
+	Id             string              `json:"id"`
+	Title          string              `json:"title"`
+	PosterUrl      string              `json:"posterUrl"`
+	Category       ProgramCategoryInfo `json:"category"`
+	VenueName      string              `json:"venueName"`
+	City           string              `json:"city"`
+	Artist         string              `json:"artist"`
+	EventStartTime string              `json:"eventStartTime"`
+	EventEndTime   string              `json:"eventEndTime"`
+	Status         int32               `json:"status"`
+	MinPrice       float64             `json:"minPrice"`
+	TicketType     int32               `json:"ticketType"`
+	IsHot          bool                `json:"isHot"`
+}
+
+type ProgramEventDetail {
+	Id             string                  `json:"id"`
+	Title          string                  `json:"title"`
+	Description    string                  `json:"description"`
+	PosterUrl      string                  `json:"posterUrl"`
+	Category       ProgramCategoryInfo     `json:"category"`
+	Venue          ProgramVenueInfo        `json:"venue"`
+	City           string                  `json:"city"`
+	Artist         string                  `json:"artist"`
+	EventStartTime string                  `json:"eventStartTime"`
+	EventEndTime   string                  `json:"eventEndTime"`
+	SaleStartTime  string                  `json:"saleStartTime"`
+	SaleEndTime    string                  `json:"saleEndTime"`
+	Status         int32                   `json:"status"`
+	PurchaseLimit  int32                   `json:"purchaseLimit"`
+	NeedRealName   int32                   `json:"needRealName"`
+	TicketType     int32                   `json:"ticketType"`
+	TicketTiers    []ProgramTicketTierInfo `json:"ticketTiers"`
+}
+
+type ListEventsReq {
+	Page       int32  `json:"page,optional"`
+	PageSize   int32  `json:"pageSize,optional"`
+	CategoryId int32  `json:"categoryId,optional"`
+	City       string `json:"city,optional"`
+	StartDate  string `json:"startDate,optional"`
+	EndDate    string `json:"endDate,optional"`
+	SortBy     string `json:"sortBy,optional"`
+}
+
+type SearchEventsReq {
+	Keyword    string `json:"keyword,optional"`
+	CategoryId int32  `json:"categoryId,optional"`
+	City       string `json:"city,optional"`
+	StartDate  string `json:"startDate,optional"`
+	EndDate    string `json:"endDate,optional"`
+	Page       int32  `json:"page,optional"`
+	PageSize   int32  `json:"pageSize,optional"`
+}
+
+type GetEventDetailReq {
+	EventId string `json:"eventId,optional"`
+}
+
+type ListCategoriesReq {
+	Status int32 `json:"status,optional"`
+}
+
+type GetHotRecommendReq {
+	City  string `json:"city,optional"`
+	Limit int32  `json:"limit,optional"`
+}
+
+type ProgramEventListResp {
+	Events   []ProgramEventBrief `json:"events"`
+	Total    int64               `json:"total"`
+	Page     int32               `json:"page"`
+	PageSize int32               `json:"pageSize"`
+}
+
+type ProgramEventDetailResp {
+	Event ProgramEventDetail `json:"event"`
+}
+
+type ProgramCategoryListResp {
+	Categories []ProgramCategoryInfo `json:"categories"`
+	Cities     []ProgramCityInfo     `json:"cities"`
+}
+
+type ProgramHotRecommendResp {
+	Events []ProgramEventBrief `json:"events"`
+}
+
+type CreateOrderReq {
+	EventId        string   `json:"eventId"`
+	TicketTierId   string   `json:"ticketTierId"`
+	Quantity       int32    `json:"quantity"`
+	TicketBuyerIds []string `json:"ticketBuyerIds"`
+	AddressId      string   `json:"addressId,optional"`
+	PayMethod      int32    `json:"payMethod,optional"`
+	RequestId      string   `json:"requestId,optional"`
+}
+
+type GetOrderQueueStatusReq {
+	QueueToken string `json:"queueToken,optional"`
+}
+
+type PayOrderReq {
+	OrderNo   string `json:"orderNo"`
+	PayMethod int32  `json:"payMethod,optional"`
+	Channel   string `json:"channel,optional"`
+}
+
+type CancelOrderReq {
+	OrderNo string `json:"orderNo"`
+}
+
+type ApplyRefundReq {
+	OrderNo string `json:"orderNo"`
+	Reason  string `json:"reason,optional"`
+}
+
+type ListOrderReq {
+	Status   int32 `json:"status,optional"`
+	Page     int32 `json:"page,optional"`
+	PageSize int32 `json:"pageSize,optional"`
+}
+
+type GetOrderDetailReq {
+	OrderNo string `json:"orderNo,optional"`
+}
+
+type OrderBuyerInfo {
+	Id     string `json:"id"`
+	Name   string `json:"name"`
+	IdCard string `json:"idCard"`
+	Phone  string `json:"phone"`
+}
+
+type OrderTicketInfo {
+	Id            string         `json:"id"`
+	TicketBuyerId string         `json:"ticketBuyerId"`
+	TicketCode    string         `json:"ticketCode"`
+	QrCodeUrl     string         `json:"qrCodeUrl"`
+	Status        int32          `json:"status"`
+	SeatInfo      string         `json:"seatInfo"`
+	VerifiedAt    string         `json:"verifiedAt"`
+	Buyer         OrderBuyerInfo `json:"buyer"`
+}
+
+type OrderPaymentInfo {
+	Id           string  `json:"id"`
+	PaymentNo    string  `json:"paymentNo"`
+	PayMethod    int32   `json:"payMethod"`
+	Amount       float64 `json:"amount"`
+	Status       int32   `json:"status"`
+	TradeNo      string  `json:"tradeNo"`
+	PaidAt       string  `json:"paidAt"`
+	CreatedAt    string  `json:"createdAt"`
+	CallbackData string  `json:"callbackData"`
+}
+
+type OrderRefundInfo {
+	Id           string  `json:"id"`
+	RefundNo     string  `json:"refundNo"`
+	RefundAmount float64 `json:"refundAmount"`
+	Status       int32   `json:"status"`
+	Reason       string  `json:"reason"`
+	RejectReason string  `json:"rejectReason"`
+	TradeNo      string  `json:"tradeNo"`
+	CreatedAt    string  `json:"createdAt"`
+	RefundedAt   string  `json:"refundedAt"`
+}
+
+type OrderDeliveryInfo {
+	TicketType     int32  `json:"ticketType"`
+	DeliveryMethod string `json:"deliveryMethod"`
+	AddressId      string `json:"addressId"`
+	ReceiverName   string `json:"receiverName"`
+	ReceiverPhone  string `json:"receiverPhone"`
+	Province       string `json:"province"`
+	City           string `json:"city"`
+	District       string `json:"district"`
+	Detail         string `json:"detail"`
+	DeliveryStatus string `json:"deliveryStatus"`
+}
+
+type OrderSummary {
+	Id             string  `json:"id"`
+	OrderNo        string  `json:"orderNo"`
+	EventId        string  `json:"eventId"`
+	TicketTierId   string  `json:"ticketTierId"`
+	EventTitle     string  `json:"eventTitle"`
+	PosterUrl      string  `json:"posterUrl"`
+	VenueName      string  `json:"venueName"`
+	City           string  `json:"city"`
+	EventStartTime string  `json:"eventStartTime"`
+	EventEndTime   string  `json:"eventEndTime"`
+	TicketTierName string  `json:"ticketTierName"`
+	Quantity       int32   `json:"quantity"`
+	UnitPrice      float64 `json:"unitPrice"`
+	TotalAmount    float64 `json:"totalAmount"`
+	Status         int32   `json:"status"`
+	StatusText     string  `json:"statusText"`
+	PayDeadline    string  `json:"payDeadline"`
+	PaidAt         string  `json:"paidAt"`
+	CancelledAt    string  `json:"cancelledAt"`
+	CreatedAt      string  `json:"createdAt"`
+	TicketType     int32   `json:"ticketType"`
+}
+
+type OrderDetail {
+	Id             string            `json:"id"`
+	OrderNo        string            `json:"orderNo"`
+	UserId         string            `json:"userId"`
+	EventId        string            `json:"eventId"`
+	TicketTierId   string            `json:"ticketTierId"`
+	EventTitle     string            `json:"eventTitle"`
+	Description    string            `json:"description"`
+	PosterUrl      string            `json:"posterUrl"`
+	VenueName      string            `json:"venueName"`
+	VenueAddress   string            `json:"venueAddress"`
+	City           string            `json:"city"`
+	EventStartTime string            `json:"eventStartTime"`
+	EventEndTime   string            `json:"eventEndTime"`
+	SaleStartTime  string            `json:"saleStartTime"`
+	SaleEndTime    string            `json:"saleEndTime"`
+	TicketTierName string            `json:"ticketTierName"`
+	Quantity       int32             `json:"quantity"`
+	UnitPrice      float64           `json:"unitPrice"`
+	TotalAmount    float64           `json:"totalAmount"`
+	Status         int32             `json:"status"`
+	StatusText     string            `json:"statusText"`
+	PayDeadline    string            `json:"payDeadline"`
+	PaidAt         string            `json:"paidAt"`
+	CancelledAt    string            `json:"cancelledAt"`
+	CreatedAt      string            `json:"createdAt"`
+	PurchaseLimit  int32             `json:"purchaseLimit"`
+	NeedRealName   int32             `json:"needRealName"`
+	TicketType     int32             `json:"ticketType"`
+	Delivery       OrderDeliveryInfo `json:"delivery"`
+	Tickets        []OrderTicketInfo `json:"tickets"`
+	Payment        OrderPaymentInfo  `json:"payment"`
+	Refund         OrderRefundInfo   `json:"refund"`
+}
+
+type CreateOrderResp {
+	OrderNo     string `json:"orderNo"`
+	QueueToken  string `json:"queueToken"`
+	QueueStatus int32  `json:"queueStatus"`
+	Message     string `json:"message"`
+}
+
+type OrderQueueStatusResp {
+	QueueToken  string       `json:"queueToken"`
+	OrderNo     string       `json:"orderNo"`
+	QueueStatus int32        `json:"queueStatus"`
+	Message     string       `json:"message"`
+	Order       OrderSummary `json:"order,optional"`
+}
+
+type PayOrderResp {
+	Success           bool             `json:"success"`
+	PayForm           string           `json:"payForm"`
+	Payment           OrderPaymentInfo `json:"payment"`
+	OrderStatus       int32            `json:"orderStatus"`
+	PaidAt            string           `json:"paidAt"`
+	CheckoutUrl       string           `json:"checkoutUrl"`
+	CheckoutSessionId string           `json:"checkoutSessionId"`
+	SessionExpiresAt  string           `json:"sessionExpiresAt"`
+}
+
+type ApplyRefundResp {
+	Success bool            `json:"success"`
+	OrderNo string          `json:"orderNo"`
+	Refund  OrderRefundInfo `json:"refund"`
+}
+
+type OrderListResp {
+	Orders   []OrderSummary `json:"orders"`
+	Total    int64          `json:"total"`
+	Page     int32          `json:"page"`
+	PageSize int32          `json:"pageSize"`
+}
+
+type OrderDetailResp {
+	Order OrderDetail `json:"order"`
+}
+
+type PaymentDetailReq {
+	OrderNo string `json:"orderNo"`
+}
+
+type PaymentTradeCheckReq {
+	OrderNo   string `json:"orderNo,optional"`
+	PaymentNo string `json:"paymentNo,optional"`
+	Channel   string `json:"channel,optional"`
+}
+
+type PaymentDetailResp {
+	Payment     OrderPaymentInfo `json:"payment"`
+	Refund      OrderRefundInfo  `json:"refund"`
+	OrderStatus int32            `json:"orderStatus"`
+	PaidAt      string           `json:"paidAt"`
+}
+
+type PaymentTradeCheckResp {
+	Success           bool             `json:"success"`
+	Paid              bool             `json:"paid"`
+	Payment           OrderPaymentInfo `json:"payment"`
+	OrderStatus       int32            `json:"orderStatus"`
+	PaidAt            string           `json:"paidAt"`
+	CheckoutSessionId string           `json:"checkoutSessionId"`
+}
+
+@server(
+	prefix: /auth
+)
+service gateway-api {
+	@handler RegisterHandler
+	post /register (RegisterReq) returns (AuthPayload)
+
+	@handler LoginHandler
+	post /login (LoginReq) returns (AuthPayload)
+
+	@handler RefreshTokenHandler
+	post /token/refresh (RefreshTokenReq) returns (RefreshTokenResp)
+
+	@handler ValidateTokenHandler
+	get /token/validate returns (ValidateTokenResp)
+
+	@handler LogoutHandler
+	post /logout (LogoutReq) returns (OperationResp)
+}
+
+@server(
+	prefix: /user
+)
+service gateway-api {
+	@handler GetProfileHandler
+	get /profile returns (UserInfo)
+
+	@handler UpdateProfileHandler
+	put /profile (UpdateProfileReq) returns (UserInfo)
+
+	@handler ChangePasswordHandler
+	put /password (ChangePasswordReq) returns (OperationResp)
+
+	@handler ListTicketBuyersHandler
+	get /ticket-buyers returns (TicketBuyerListResp)
+
+	@handler CreateTicketBuyerHandler
+	post /ticket-buyers (CreateTicketBuyerReq) returns (TicketBuyerResp)
+
+	@handler UpdateTicketBuyerHandler
+	put /ticket-buyers (UpdateTicketBuyerReq) returns (TicketBuyerResp)
+
+	@handler DeleteTicketBuyerHandler
+	delete /ticket-buyers (DeleteTicketBuyerReq) returns (OperationResp)
+
+	@handler SetDefaultTicketBuyerHandler
+	put /ticket-buyers/default (SetDefaultTicketBuyerReq) returns (OperationResp)
+
+	@handler ListAddressesHandler
+	get /addresses returns (AddressListResp)
+
+	@handler CreateAddressHandler
+	post /addresses (CreateAddressReq) returns (AddressResp)
+
+	@handler UpdateAddressHandler
+	put /addresses (UpdateAddressReq) returns (AddressResp)
+
+	@handler DeleteAddressHandler
+	delete /addresses (DeleteAddressReq) returns (OperationResp)
+
+	@handler SetDefaultAddressHandler
+	put /addresses/default (SetDefaultAddressReq) returns (OperationResp)
+}
+
+@server(
+	prefix: /program
+)
+service gateway-api {
+	@handler ListEventsHandler
+	get /events (ListEventsReq) returns (ProgramEventListResp)
+
+	@handler SearchEventsHandler
+	get /events/search (SearchEventsReq) returns (ProgramEventListResp)
+
+	@handler GetEventDetailHandler
+	get /events/detail (GetEventDetailReq) returns (ProgramEventDetailResp)
+
+	@handler ListCategoriesHandler
+	get /categories (ListCategoriesReq) returns (ProgramCategoryListResp)
+
+	@handler GetHotRecommendHandler
+	get /hot-recommend (GetHotRecommendReq) returns (ProgramHotRecommendResp)
+}
+
+@server(
+	prefix: /order
+)
+service gateway-api {
+	@handler CreateOrderHandler
+	post /create (CreateOrderReq) returns (CreateOrderResp)
+
+	@handler GetOrderQueueStatusHandler
+	get /queue-status (GetOrderQueueStatusReq) returns (OrderQueueStatusResp)
+
+	@handler PayOrderHandler
+	post /pay (PayOrderReq) returns (PayOrderResp)
+
+	@handler CancelOrderHandler
+	post /cancel (CancelOrderReq) returns (OperationResp)
+
+	@handler ApplyRefundHandler
+	post /refund (ApplyRefundReq) returns (ApplyRefundResp)
+
+	@handler ListOrderHandler
+	get /list (ListOrderReq) returns (OrderListResp)
+
+	@handler GetOrderDetailHandler
+	get /detail (GetOrderDetailReq) returns (OrderDetailResp)
+}
+
+@server(
+	prefix: /payment
+)
+service gateway-api {
+	@handler PaymentDetailHandler
+	get /detail (PaymentDetailReq) returns (PaymentDetailResp)
+
+	@handler PaymentTradeCheckHandler
+	post /check (PaymentTradeCheckReq) returns (PaymentTradeCheckResp)
+
+	@handler PaymentTradeCheckHandler
+	post /status (PaymentTradeCheckReq) returns (PaymentTradeCheckResp)
+}

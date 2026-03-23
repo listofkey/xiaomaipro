@@ -1,0 +1,23 @@
+{
+  "skill_name": "mysql-sql-checker",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "帮我检查下 app/rpc/user/internal/logic/ 目录下所有文件的数据库操作有没有问题",
+      "expected_output": "对logic目录中的每个文件逐一检查，识别出setDefaultAddressLogic.go和setDefaultTicketBuyerLogic.go中使用匿名struct搭配Table的模式，以及可能缺少WithContext的情况。输出结构化报告。",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "我写了一段代码，帮我检查下SQL有没有问题：\n\n```go\nfunc (l *OrderLogic) CreateOrder(in *userpb.CreateOrderReq) error {\n    // 查询票价\n    var price float64\n    err := l.svcCtx.DB.Raw(\"SELECT price FROM ticket_tier WHERE id = ? AND status = 'active' RETURNING id\", in.TierId).Scan(&price).Error\n    if err != nil {\n        return err\n    }\n\n    // 创建订单\n    sql := fmt.Sprintf(\"INSERT INTO order_info (user_id, event_id, total_amount, status) VALUES (%d, %d, %f, 'pending'))\", in.UserId, in.EventId, price)\n    return l.svcCtx.DB.Exec(sql).Error\n}\n```",
+      "expected_output": "识别出至少3个问题：1) RETURNING是PostgreSQL语法MySQL不支持 2) fmt.Sprintf拼接SQL有注入风险 3) INSERT语句多了一个右括号。输出清晰的错误报告。",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "检查下这段GORM代码有没有问题：\n\n```go\nfunc (l *EventLogic) UpdateEventStatus(eventId int64, status int32) error {\n    q := l.svcCtx.Query\n    db := l.svcCtx.DB\n\n    // 批量更新关联的票种状态\n    db.Transaction(func(tx *gorm.DB) error {\n        // 更新活动状态\n        q.Event.Where(q.Event.ID.Eq(eventId)).Updates(map[string]interface{}{\n            \"Status\": status,\n            \"updated_at\": time.Now(),\n        })\n\n        // 更新所有票种\n        tx.Model(&model.TicketTier{}).Update(\"status\", status)\n\n        return nil\n    })\n\n    return nil\n}\n```",
+      "expected_output": "识别出多个问题：1) 事务内用了q而非tx(不在事务内) 2) Updates的map中Status应该用列名status 3) tx.Model缺少Where条件会全表更新 4) 事务返回值被忽略 5) 缺少WithContext。输出结构化报告。",
+      "files": []
+    }
+  ]
+}

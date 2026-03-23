@@ -1,0 +1,65 @@
+package svc
+
+import (
+	"context"
+	"time"
+
+	"server/app/rpc/dao"
+	"server/app/rpc/user/internal/config"
+	"server/app/rpc/user/internal/pkg/encrypt"
+
+	"github.com/redis/go-redis/v9"
+	"github.com/zeromicro/go-zero/core/logx"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
+)
+
+type ServiceContext struct {
+	Config config.Config
+	DB     *gorm.DB
+	Query  *dao.Query
+	Redis  *redis.Client
+}
+
+func NewServiceContext(c config.Config) *ServiceContext {
+	if err := encrypt.ValidateAESKey(c.AES.Key); err != nil {
+		panic("invalid AES key config: " + err.Error())
+	}
+
+	db, err := gorm.Open(postgres.Open(c.DB.DSN), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Info),
+	})
+	if err != nil {
+		panic("failed to connect database: " + err.Error())
+	}
+
+	dao.SetDefault(db)
+	q := dao.Use(db)
+
+	var rdb *redis.Client
+	if c.RedisConfig.Host != "" {
+		rdb = redis.NewClient(&redis.Options{
+			Addr:     c.RedisConfig.Host,
+			Password: c.RedisConfig.Password,
+			DB:       c.RedisConfig.DB,
+		})
+
+		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+		defer cancel()
+
+		if _, err := rdb.Ping(ctx).Result(); err != nil {
+			logx.Errorf("redis connect failed, continue without token blacklist: %v", err)
+			rdb = nil
+		} else {
+			logx.Infof("redis connected: %s", c.RedisConfig.Host)
+		}
+	}
+
+	return &ServiceContext{
+		Config: c,
+		DB:     db,
+		Query:  q,
+		Redis:  rdb,
+	}
+}

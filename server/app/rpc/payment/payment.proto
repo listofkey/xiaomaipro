@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package payment;
+
+option go_package = "server/paymentpb;paymentpb";
+
+message PaymentInfo {
+  int64 id = 1;
+  string payment_no = 2;
+  int32 pay_method = 3;
+  double amount = 4;
+  int32 status = 5;
+  string trade_no = 6;
+  string paid_at = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  string callback_data = 10;
+}
+
+message RefundInfo {
+  int64 id = 1;
+  string refund_no = 2;
+  double refund_amount = 3;
+  int32 status = 4;
+  string reason = 5;
+  string reject_reason = 6;
+  string trade_no = 7;
+  string created_at = 8;
+  string updated_at = 9;
+  string refunded_at = 10;
+}
+
+message PayOrderReq {
+  int64 user_id = 1;
+  string order_no = 2;
+  int32 pay_method = 3;
+  string channel = 4;
+  string notify_url = 5;
+  string return_url = 6;
+  string subject = 7;
+}
+
+message PayOrderResp {
+  bool success = 1;
+  string pay_form = 2;
+  PaymentInfo payment = 3;
+  int32 order_status = 4;
+  string paid_at = 5;
+  string checkout_url = 6;
+  string checkout_session_id = 7;
+  string session_expires_at = 8;
+}
+
+message NotifyReq {
+  string channel = 1;
+  map<string, string> params = 2;
+  bytes raw_body = 3;
+  map<string, string> headers = 4;
+  string signature = 5;
+}
+
+message NotifyResp {
+  bool success = 1;
+  string ack_text = 2;
+  string order_no = 3;
+  PaymentInfo payment = 4;
+  int32 order_status = 5;
+  string paid_at = 6;
+}
+
+message TradeCheckReq {
+  int64 user_id = 1;
+  string order_no = 2;
+  string payment_no = 3;
+  string channel = 4;
+}
+
+message TradeCheckResp {
+  bool success = 1;
+  bool paid = 2;
+  PaymentInfo payment = 3;
+  int32 order_status = 4;
+  string paid_at = 5;
+  string checkout_session_id = 6;
+}
+
+message RefundReq {
+  int64 user_id = 1;
+  string order_no = 2;
+  string reason = 3;
+  string channel = 4;
+  double refund_amount = 5;
+}
+
+message RefundResp {
+  bool success = 1;
+  string order_no = 2;
+  RefundInfo refund = 3;
+  int32 order_status = 4;
+  bool should_release = 5;
+}
+
+message DetailReq {
+  int64 user_id = 1;
+  string order_no = 2;
+}
+
+message DetailResp {
+  PaymentInfo payment = 1;
+  RefundInfo refund = 2;
+  int32 order_status = 3;
+  string paid_at = 4;
+}
+
+service PaymentService {
+  rpc PayOrder(PayOrderReq) returns (PayOrderResp);
+  rpc Notify(NotifyReq) returns (NotifyResp);
+  rpc TradeCheck(TradeCheckReq) returns (TradeCheckResp);
+  rpc Refund(RefundReq) returns (RefundResp);
+  rpc Detail(DetailReq) returns (DetailResp);
+}

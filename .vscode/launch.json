@@ -1,0 +1,93 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "调试 User API (go-zero)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            // 1. 指定包含 main.go 的目录 (重要：根据你的实际路径修改)
+            "program": "${workspaceFolder}/server/app/api", 
+            
+            // 2. 指定工作目录，确保程序能用相对路径找到 etc/xxx.yaml
+            "cwd": "${workspaceFolder}/server/app/api",
+            
+            // 3. 传递给 go-zero 的命令行参数，指定配置文件
+            "args": [
+                "-f",
+                "etc/gateway-api.yaml" 
+            ],
+            "showLog": true
+        },
+        {
+            "name": "调试 User RPC (go-zero)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            // 同样的方式，你可以为 RPC 服务添加一个配置
+            "program": "${workspaceFolder}/server/app/rpc/user",
+            "cwd": "${workspaceFolder}/server/app/rpc/user",
+            "args": [
+                "-f",
+                "etc/user.yaml"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "调试 Program RPC (go-zero)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            // 同样的方式，你可以为 RPC 服务添加一个配置
+            "program": "${workspaceFolder}/server/app/rpc/program",
+            "cwd": "${workspaceFolder}/server/app/rpc/program",
+            "args": [
+                "-f",
+                "etc/program.yaml"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "调试 Order RPC (go-zero)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            // 同样的方式，你可以为 RPC 服务添加一个配置
+            "program": "${workspaceFolder}/server/app/rpc/order",
+            "cwd": "${workspaceFolder}/server/app/rpc/order",
+            "args": [
+                "-f",
+                "etc/order.yaml"
+            ],
+            "showLog": true
+        },
+        {
+            "name": "调试 Payment RPC (go-zero)",
+            "type": "go",
+            "request": "launch",
+            "mode": "auto",
+            // 同样的方式，你可以为 RPC 服务添加一个配置
+            "program": "${workspaceFolder}/server/app/rpc/payment",
+            "cwd": "${workspaceFolder}/server/app/rpc/payment",
+            "args": [
+                "-f",
+                "etc/payment.yaml"
+            ],
+            "showLog": true
+        }
+    ],
+    // 3. 复合启动项配置
+    "compounds": [
+        {
+            "name": "一键调试全链路 (API + RPC)",
+            "configurations": [
+                "调试 User API (go-zero)",  // 名字必须与上方 configurations 中的 name 严格一致
+                "调试 User RPC (go-zero)",
+                "调试 Program RPC (go-zero)",
+                "调试 Order RPC (go-zero)",
+                "调试 Payment RPC (go-zero)"
+            ],
+            "stopAll": true       // 设为 true 时，当你停止其中一个调试，另一个也会自动停止
+        }
+    ]
+}

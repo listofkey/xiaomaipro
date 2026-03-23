@@ -1,0 +1,125 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  /* Common UI Palette */
+  --primary-color: #5762ff;
+  --accent-cyan: #00e5ff;
+  --accent-pink: #ff2a85;
+  --accent-green: #00ff88;
+
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 64px;
+  --header-height: 60px;
+
+  --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Light Mode Variables */
+html {
+  --bg-color: #f3f4f6;
+  --bg-surface: rgba(255, 255, 255, 0.85);
+  --bg-header: rgba(255, 255, 255, 0.9);
+
+  --text-primary: #111827;
+  --text-secondary: #4b5563;
+  --text-muted: #9ca3af;
+
+  --border-color: rgba(0, 0, 0, 0.08);
+
+  --glass-bg: rgba(255, 255, 255, 0.65);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.05);
+  --shadow-glow: 0 0 20px rgba(87, 98, 255, 0.15);
+
+  --el-bg-color-page: var(--bg-color);
+  --el-bg-color: var(--bg-surface);
+}
+
+/* Dark Mode Variables */
+html.dark {
+  --bg-color: #0f1115;
+  --bg-surface: rgba(25, 28, 36, 0.6);
+  --bg-header: rgba(15, 17, 21, 0.8);
+
+  --text-primary: #f0f2f5;
+  --text-secondary: #a0a5b5;
+  --text-muted: #6e7385;
+
+  --border-color: rgba(255, 255, 255, 0.08);
+
+  --glass-bg: rgba(20, 22, 28, 0.65);
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.2);
+  --shadow-glow: 0 0 20px rgba(87, 98, 255, 0.25);
+
+  --el-bg-color-page: var(--bg-color);
+  --el-bg-color: var(--bg-surface);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  margin: 0;
+  overflow: hidden;
+  transition: background-color var(--transition-normal);
+}
+
+/* Base App Elements */
+.text-gradient {
+  background: linear-gradient(135deg, var(--text-primary) 0%, var(--text-secondary) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.primary-gradient {
+  background: linear-gradient(135deg, var(--primary-color) 0%, var(--accent-cyan) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.flex-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* Element Plus Overrides to match aesthetic */
+.el-header {
+  --el-header-padding: 0 20px;
+}
+
+/* Make Sidebar look cohesive */
+.el-menu {
+  border-right: none !important;
+  background-color: transparent !important;
+}
+
+/* Reset Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 4px;
+}

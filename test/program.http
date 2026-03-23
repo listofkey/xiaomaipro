@@ -1,0 +1,17 @@
+
+
+@host = http://localhost:8080
+
+
+GET http://localhost:8080/program/events/detail HTTP/1.1
+
+
+
+POST {{host}}/order/refund HTTP/1.1
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMjAzNTAyNjYyMDg0MTk5MjE5MiIsInR5cGUiOiJhY2Nlc3MiLCJpc3MiOiJ4aWFvbWFpcHJvIiwiZXhwIjoxNzc0Mjg0OTQ4LCJpYXQiOjE3NzQyNzc3NDh9.eMbaxaVST9CrLcYpHbrBL6gILSD5CDcRH5I43CKlB3I
+Content-Type: application/json
+
+{
+  "orderNo": "2036114040849178624",
+  "reason": "user apply"
+}

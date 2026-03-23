@@ -1,0 +1,23 @@
+Name: user.rpc
+ListenOn: 0.0.0.0:8081
+
+Etcd:
+  Hosts:
+    - "${ETCD_ENDPOINT}"
+  Key: user.rpc
+
+DB:
+  DSN: "${POSTGRES_DSN}"
+
+RedisConfig:
+  Host: "${REDIS_ADDR}"
+  Password: "${REDIS_PASSWORD}"
+  DB: ${REDIS_DB}
+
+JWT:
+  AccessSecret: "${JWT_ACCESS_SECRET}"
+  AccessExpire: ${JWT_ACCESS_EXPIRE}
+  RefreshExpire: ${JWT_REFRESH_EXPIRE}
+
+AES:
+  Key: "${AES_KEY}"

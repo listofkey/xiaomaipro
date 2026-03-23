@@ -1,0 +1,211 @@
+name: ci-cd
+
+on:
+  push:
+    branches:
+      - master
+      - main
+  pull_request:
+    branches:
+      - master
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  IMAGE_TAG: ${{ github.sha }}
+  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            front/pnpm-lock.yaml
+            web/pnpm-lock.yaml
+
+      - name: Run Go tests
+        working-directory: server
+        run: go test ./common/... ./app/...
+
+      - name: Install front dependencies
+        working-directory: front
+        run: pnpm install --frozen-lockfile
+
+      - name: Build front
+        working-directory: front
+        env:
+          VITE_API_BASE_URL: /api
+        run: pnpm build
+
+      - name: Install admin dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build admin
+        working-directory: web
+        run: pnpm build -- --base=/admin/
+
+      - name: Validate Docker Compose
+        run: |
+          cp deploy/.env.example deploy/.env
+          docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml config > /dev/null
+          rm -f deploy/.env
+
+  publish-images:
+    if: github.event_name == 'push'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image_name: xiaomaipro-gateway
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: |
+              SERVICE_PATH=./app/api
+          - image_name: xiaomaipro-user-rpc
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: |
+              SERVICE_PATH=./app/rpc/user
+          - image_name: xiaomaipro-program-rpc
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: |
+              SERVICE_PATH=./app/rpc/program
+          - image_name: xiaomaipro-order-rpc
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: |
+              SERVICE_PATH=./app/rpc/order
+          - image_name: xiaomaipro-payment-rpc
+            dockerfile: deploy/docker/backend.Dockerfile
+            build_args: |
+              SERVICE_PATH=./app/rpc/payment
+          - image_name: xiaomaipro-proxy
+            dockerfile: deploy/docker/proxy.Dockerfile
+            build_args: |
+              FRONT_VITE_API_BASE_URL=/api
+              ADMIN_BASE_PATH=/admin/
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_NAMESPACE }}/${{ matrix.image_name }}
+          tags: |
+            type=raw,value=${{ env.IMAGE_TAG }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: true
+          platforms: linux/amd64
+          build-args: ${{ matrix.build_args }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=${{ matrix.image_name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image_name }}
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: publish-images
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_PORT: ${{ secrets.VPS_PORT }}
+      VPS_DEPLOY_PATH: ${{ secrets.VPS_DEPLOY_PATH }}
+      VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Prepare SSH
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "$PORT" "$VPS_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync deploy files to VPS
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          DEPLOY_PATH="${VPS_DEPLOY_PATH:-/opt/xiaomaipro}"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$VPS_USER@$VPS_HOST" "mkdir -p '$DEPLOY_PATH/deploy'"
+
+          rsync -az --delete \
+            --exclude '.env' \
+            -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" \
+            ./deploy/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/deploy/"
+
+      - name: Login to Docker Hub on VPS
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "docker login -u '$DOCKERHUB_USERNAME' --password-stdin" <<< "$DOCKERHUB_TOKEN"
+
+      - name: Deploy on VPS
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          DEPLOY_PATH="${VPS_DEPLOY_PATH:-/opt/xiaomaipro}"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "cd '$DEPLOY_PATH' && DOCKERHUB_NAMESPACE='$DOCKERHUB_NAMESPACE' APP_IMAGE_TAG='$IMAGE_TAG' bash deploy/scripts/deploy.sh"

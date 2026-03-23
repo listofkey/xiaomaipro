@@ -1,0 +1,363 @@
+syntax = "proto3";
+
+package user;
+
+option go_package = "./userpb";
+
+// ========================
+// 公共消息结构
+// ========================
+
+// 用户基本信息
+message UserInfo {
+  int64  id          = 1;  // 用户ID
+  string username    = 2;  // 用户名
+  string phone       = 3;  // 手机号（脱敏）
+  string email       = 4;  // 邮箱
+  string nickname    = 5;  // 昵称
+  string avatar      = 6;  // 头像URL
+  int32  status      = 7;  // 状态: 0禁用 1正常
+  int32  is_verified = 8;  // 是否实名认证: 0否 1是
+  string real_name   = 9;  // 真实姓名（脱敏，已实名可见）
+  string created_at  = 10; // 注册时间
+}
+
+// 收货地址
+message AddressInfo {
+  int64  id             = 1;  // 地址ID
+  int64  user_id        = 2;  // 所属用户ID
+  string receiver_name  = 3;  // 收件人姓名
+  string receiver_phone = 4;  // 收件人电话
+  string province       = 5;  // 省
+  string city           = 6;  // 市
+  string district       = 7;  // 区
+  string detail         = 8;  // 详细地址
+  int32  is_default     = 9;  // 是否默认: 0否 1是
+  string created_at     = 10; // 创建时间
+}
+
+// 购票人信息
+message TicketBuyerInfo {
+  int64  id         = 1;  // 购票人ID
+  int64  user_id    = 2;  // 所属用户ID
+  string name       = 3;  // 姓名
+  string id_card    = 4;  // 身份证号（脱敏）
+  string phone      = 5;  // 联系电话
+  int32  is_default = 6;  // 是否默认: 0否 1是
+  string created_at = 7;  // 创建时间
+}
+
+// ========================
+// 1. 用户注册
+// ========================
+
+message RegisterReq {
+  string phone    = 1; // 手机号（与邮箱二选一）
+  string email    = 2; // 邮箱（与手机号二选一）
+  string password = 3; // 密码（明文，服务端 BCrypt 加密）
+  string nickname = 4; // 昵称（可选, 默认手机号或邮箱前缀）
+  string code     = 5; // 短信/邮箱验证码
+}
+
+message RegisterResp {
+  int64  user_id      = 1; // 用户ID
+  string access_token = 2; // JWT Access Token
+  string refresh_token = 3; // JWT Refresh Token
+  int64  expires_in   = 4; // access_token 过期时间（秒）
+}
+
+// ========================
+// 2. 用户登录
+// ========================
+
+message LoginReq {
+  string account  = 1; // 账号（手机号或邮箱）
+  string password = 2; // 密码
+}
+
+message LoginResp {
+  int64    user_id      = 1; // 用户ID
+  UserInfo user_info    = 2; // 用户基本信息
+  string   access_token = 3; // JWT Access Token
+  string   refresh_token = 4; // JWT Refresh Token
+  int64    expires_in   = 5; // access_token 过期时间（秒）
+}
+
+// ========================
+// 3. JWT Token 刷新
+// ========================
+
+message RefreshTokenReq {
+  string refresh_token = 1; // 有效的 Refresh Token
+}
+
+message RefreshTokenResp {
+  string access_token  = 1; // 新的 Access Token
+  string refresh_token = 2; // 新的 Refresh Token（可选轮转）
+  int64  expires_in    = 3; // 过期时间（秒）
+}
+
+// ========================
+// 4. 登出
+// ========================
+
+message LogoutReq {
+  int64  user_id      = 1; // 用户ID
+  string access_token = 2; // 当前 access_token（加入黑名单）
+}
+
+message LogoutResp {
+  bool success = 1;
+}
+
+// ========================
+// 5. 获取用户信息
+// ========================
+
+message GetUserInfoReq {
+  int64 user_id = 1; // 用户ID
+}
+
+message GetUserInfoResp {
+  UserInfo user_info = 1;
+}
+
+// ========================
+// 6. 更新个人信息
+// ========================
+
+message UpdateUserInfoReq {
+  int64  user_id  = 1; // 用户ID
+  string nickname = 2; // 昵称（可选）
+  string avatar   = 3; // 头像URL（可选）
+  string email    = 4; // 邮箱（可选）
+}
+
+message UpdateUserInfoResp {
+  UserInfo user_info = 1;
+}
+
+// ========================
+// 7. 修改密码
+// ========================
+
+message ChangePasswordReq {
+  int64  user_id      = 1; // 用户ID
+  string old_password = 2; // 旧密码
+  string new_password = 3; // 新密码
+}
+
+message ChangePasswordResp {
+  bool success = 1;
+}
+
+// ========================
+// 8. 实名认证
+// ========================
+
+message VerifyRealNameReq {
+  int64  user_id   = 1; // 用户ID
+  string real_name = 2; // 真实姓名
+  string id_card   = 3; // 身份证号
+}
+
+message VerifyRealNameResp {
+  bool   success    = 1; // 认证是否通过
+  string message    = 2; // 结果说明
+  int32  is_verified = 3; // 认证状态: 0否 1是
+}
+
+// ========================
+// 9. 收货地址 - 新增
+// ========================
+
+message CreateAddressReq {
+  int64  user_id        = 1;
+  string receiver_name  = 2; // 收件人姓名
+  string receiver_phone = 3; // 收件人电话
+  string province       = 4; // 省
+  string city           = 5; // 市
+  string district       = 6; // 区
+  string detail         = 7; // 详细地址
+  int32  is_default     = 8; // 是否设为默认: 0否 1是
+}
+
+message CreateAddressResp {
+  AddressInfo address = 1;
+}
+
+// ========================
+// 10. 收货地址 - 更新
+// ========================
+
+message UpdateAddressReq {
+  int64  address_id     = 1;
+  int64  user_id        = 2;
+  string receiver_name  = 3;
+  string receiver_phone = 4;
+  string province       = 5;
+  string city           = 6;
+  string district       = 7;
+  string detail         = 8;
+  int32  is_default     = 9;
+}
+
+message UpdateAddressResp {
+  AddressInfo address = 1;
+}
+
+// ========================
+// 11. 收货地址 - 删除
+// ========================
+
+message DeleteAddressReq {
+  int64 address_id = 1;
+  int64 user_id    = 2;
+}
+
+message DeleteAddressResp {
+  bool success = 1;
+}
+
+// ========================
+// 12. 收货地址 - 列表
+// ========================
+
+message ListAddressReq {
+  int64 user_id = 1;
+}
+
+message ListAddressResp {
+  repeated AddressInfo addresses = 1;
+}
+
+// ========================
+// 13. 收货地址 - 设置默认
+// ========================
+
+message SetDefaultAddressReq {
+  int64 address_id = 1;
+  int64 user_id    = 2;
+}
+
+message SetDefaultAddressResp {
+  bool success = 1;
+}
+
+// ========================
+// 14. 购票人 - 新增
+// ========================
+
+message CreateTicketBuyerReq {
+  int64  user_id    = 1;
+  string name       = 2; // 姓名
+  string id_card    = 3; // 身份证号
+  string phone      = 4; // 联系电话
+  int32  is_default = 5; // 是否默认: 0否 1是
+}
+
+message CreateTicketBuyerResp {
+  TicketBuyerInfo ticket_buyer = 1;
+}
+
+// ========================
+// 15. 购票人 - 更新
+// ========================
+
+message UpdateTicketBuyerReq {
+  int64  buyer_id   = 1;
+  int64  user_id    = 2;
+  string name       = 3;
+  string id_card    = 4;
+  string phone      = 5;
+  int32  is_default = 6;
+}
+
+message UpdateTicketBuyerResp {
+  TicketBuyerInfo ticket_buyer = 1;
+}
+
+// ========================
+// 16. 购票人 - 删除
+// ========================
+
+message DeleteTicketBuyerReq {
+  int64 buyer_id = 1;
+  int64 user_id  = 2;
+}
+
+message DeleteTicketBuyerResp {
+  bool success = 1;
+}
+
+// ========================
+// 17. 购票人 - 列表
+// ========================
+
+message ListTicketBuyerReq {
+  int64 user_id = 1;
+}
+
+message ListTicketBuyerResp {
+  repeated TicketBuyerInfo ticket_buyers = 1;
+}
+
+// ========================
+// 18. 购票人 - 设置默认
+// ========================
+
+message SetDefaultTicketBuyerReq {
+  int64 buyer_id = 1;
+  int64 user_id  = 2;
+}
+
+message SetDefaultTicketBuyerResp {
+  bool success = 1;
+}
+
+// ========================
+// 19. Token 校验（供其他 RPC 服务调用）
+// ========================
+
+message ValidateTokenReq {
+  string access_token = 1;
+}
+
+message ValidateTokenResp {
+  bool   valid    = 1; // Token 是否有效
+  int64  user_id  = 2; // 解析出的用户ID
+  int32  status   = 3; // 用户状态
+}
+
+// ========================
+// UserService RPC 定义
+// ========================
+
+service UserService {
+  // --- 认证相关 ---
+  rpc Register(RegisterReq)           returns (RegisterResp);         // 注册（手机号/邮箱 + 密码）
+  rpc Login(LoginReq)                 returns (LoginResp);            // 密码登录
+  rpc RefreshToken(RefreshTokenReq)   returns (RefreshTokenResp);     // 刷新 Token
+  rpc Logout(LogoutReq)               returns (LogoutResp);           // 登出
+  rpc ValidateToken(ValidateTokenReq) returns (ValidateTokenResp);    // Token 校验
+
+  // --- 用户信息 ---
+  rpc GetUserInfo(GetUserInfoReq)         returns (GetUserInfoResp);      // 获取用户信息
+  rpc UpdateUserInfo(UpdateUserInfoReq)   returns (UpdateUserInfoResp);   // 更新个人信息
+  rpc ChangePassword(ChangePasswordReq)   returns (ChangePasswordResp);   // 修改密码
+  rpc VerifyRealName(VerifyRealNameReq)   returns (VerifyRealNameResp);   // 实名认证
+
+  // --- 收货地址 ---
+  rpc CreateAddress(CreateAddressReq)         returns (CreateAddressResp);         // 新增地址
+  rpc UpdateAddress(UpdateAddressReq)         returns (UpdateAddressResp);         // 更新地址
+  rpc DeleteAddress(DeleteAddressReq)         returns (DeleteAddressResp);         // 删除地址
+  rpc ListAddress(ListAddressReq)             returns (ListAddressResp);           // 地址列表
+  rpc SetDefaultAddress(SetDefaultAddressReq) returns (SetDefaultAddressResp);     // 设置默认地址
+
+  // --- 常用购票人 ---
+  rpc CreateTicketBuyer(CreateTicketBuyerReq)         returns (CreateTicketBuyerResp);         // 新增购票人
+  rpc UpdateTicketBuyer(UpdateTicketBuyerReq)         returns (UpdateTicketBuyerResp);         // 更新购票人
+  rpc DeleteTicketBuyer(DeleteTicketBuyerReq)         returns (DeleteTicketBuyerResp);         // 删除购票人
+  rpc ListTicketBuyer(ListTicketBuyerReq)             returns (ListTicketBuyerResp);           // 购票人列表
+  rpc SetDefaultTicketBuyer(SetDefaultTicketBuyerReq) returns (SetDefaultTicketBuyerResp);     // 设置默认购票人
+}

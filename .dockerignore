@@ -1,0 +1,12 @@
+.git
+.github
+.vscode
+.VSCodeCounter
+front/node_modules
+front/dist
+web/node_modules
+web/dist
+server/app/api/__debug_bin.exe*
+server/app/rpc/**/__debug_bin.exe*
+**/.DS_Store
+**/*.log

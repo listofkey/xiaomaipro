@@ -1,0 +1,62 @@
+@host = http://localhost:8080
+@token = Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiMjAzNTAyNjYyMDg0MTk5MjE5MiIsInR5cGUiOiJhY2Nlc3MiLCJpc3MiOiJ4aWFvbWFpcHJvIiwiZXhwIjoxNzc0Mjg0OTQ4LCJpYXQiOjE3NzQyNzc3NDh9.eMbaxaVST9CrLcYpHbrBL6gILSD5CDcRH5I43CKlB3I
+@queueToken = REPLACE_QUEUE_TOKEN
+@orderNo = 2036114040849178624
+
+### create order
+POST {{host}}/order/create HTTP/1.1
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "eventId": "140000000000000001",
+  "ticketTierId": "150000000000000001",
+  "quantity": 1,
+  "ticketBuyerIds": [
+    "110000000000000001"
+  ],
+  "payMethod": 1,
+  "requestId": "debug-order-001"
+}
+
+### get queue status
+GET {{host}}/order/queue-status?queueToken={{queueToken}} HTTP/1.1
+Authorization: {{token}}
+
+### pay order
+POST {{host}}/order/pay HTTP/1.1
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "orderNo": "{{orderNo}}",
+  "payMethod": 1,
+  "channel": "web"
+}
+
+### cancel order
+POST {{host}}/order/cancel HTTP/1.1
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "orderNo": "{{orderNo}}"
+}
+
+### apply refund
+POST {{host}}/order/refund HTTP/1.1
+Authorization: {{token}}
+Content-Type: application/json
+
+{
+  "orderNo": "{{orderNo}}",
+  "reason": "user apply"
+}
+
+### list orders
+GET {{host}}/order/list?page=1&pageSize=20 HTTP/1.1
+Authorization: {{token}}
+
+### get order detail
+GET {{host}}/order/detail?orderNo={{orderNo}} HTTP/1.1
+Authorization: {{token}}

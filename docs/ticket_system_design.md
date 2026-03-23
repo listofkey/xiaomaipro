@@ -1,0 +1,779 @@
+# 🎫 票务抢票系统 — 系统设计文档
+
+> [!IMPORTANT]
+> 本系统设计目标：支撑 **10万级** 用户同时在线抢票，保证高并发场景下的数据一致性和系统可用性。
+
+---
+
+## 一、主要功能清单
+
+### 1. 用户模块
+
+| 功能 | 说明 |
+|------|------|
+| 用户注册/登录 | 手机号/邮箱注册，支持短信验证码登录、密码登录 |
+| JWT Token 鉴权 | 基于 JWT 的无状态认证，支持 Token 刷新 |
+| 个人信息管理 | 昵称、头像、手机号、实名认证信息维护 |
+| 实名认证 | 身份证号+姓名实名认证（购票必备） |
+| 收货地址管理 | 支持多地址管理，用于实体票邮寄 |
+| 常用购票人 | 管理多个购票人信息（一人可为多人购票） |
+
+### 2. 活动/演出管理模块
+
+| 功能 | 说明 |
+|------|------|
+| 活动列表 | 分页展示活动列表，支持分类、城市、时间筛选 |
+| 活动详情 | 活动名称、时间、地点、票价档位、座位图、艺人信息 |
+| 活动搜索 | 按关键词、分类、城市、日期范围搜索 |
+| 活动分类 | 演唱会、音乐节、话剧、体育赛事、展览等 |
+| 活动收藏/关注 | 收藏感兴趣的活动，开票提醒推送 |
+| 热门推荐 | 基于热度、城市、偏好推荐活动 |
+
+### 3. 票务核心模块（高并发核心） 
+
+| 功能 | 说明 |
+|------|------|
+| 票档管理 | 同一活动多个票价档位（VIP、内场、看台等） |
+| 库存管理 | Redis 预扣库存 + MySQL 最终落库，防超卖 |
+| 抢票下单 | 秒杀级抢票，限流 + 排队 + 异步下单 |
+| 排队机制 | 高峰期用户进入排队队列，Kafka 消息异步消费 |
+| 限购策略 | 每人每场限购 N 张，防黄牛策略 |
+| 座位锁定 | 选座场景下，临时锁定座位（15分钟有效） |
+| 库存预热 | 开票前将库存数据从 MySQL 预热至 Redis |
+
+### 4. 订单模块
+
+| 功能 | 说明 |
+|------|------|
+| 订单创建 | 抢票成功后自动创建订单，状态：待支付 |
+| 订单支付 | 支持支付宝/微信支付，15分钟未支付自动取消 |
+| 订单取消 | 手动取消或超时自动取消，释放库存 |
+| 订单退款 | 根据退款规则申请退款 |
+| 订单列表 | 用户查看历史订单，按状态筛选 |
+| 订单详情 | 订单号、票务信息、支付信息、物流信息 |
+| 电子票生成 | 支付完成后生成电子票（二维码） |
+
+### 5. 支付模块
+
+| 功能 | 说明 |
+|------|------|
+| 支付宝支付 | 对接支付宝 API |
+| 微信支付 | 对接微信支付 API |
+| 支付回调 | 异步接收支付结果通知 |
+| 退款处理 | 原路退回 |
+| 支付流水 | 记录所有支付/退款流水 |
+
+### 6. 通知模块
+
+| 功能 | 说明 |
+|------|------|
+| 短信通知 | 注册验证码、抢票结果、订单状态变更 |
+| 站内消息 | 系统公告、活动提醒、订单通知 |
+| 开票提醒 | 关注的活动即将开票时推送提醒 |
+| WebSocket 推送 | 排队进度实时推送 |
+
+### 7. 后台管理模块（Admin）
+
+| 功能 | 说明 |
+|------|------|
+| 活动管理 | 活动的创建、编辑、上下架 |
+| 票档管理 | 票价档位配置、库存设置 |
+| 订单管理 | 订单查询、退款审核 |
+| 用户管理 | 用户查询、封禁/解封 |
+| 数据统计 | 销售数据、用户活跃度、流量监控 |
+| 系统配置 | 限流规则、限购策略、退款规则配置 |
+| 操作日志 | 管理员操作审计日志 |
+
+### 8. 风控/安全模块
+
+| 功能 | 说明 |
+|------|------|
+| 接口限流 | 基于 Redis 的令牌桶/滑动窗口限流 |
+| 黄牛检测 | 设备指纹、IP频率、行为分析 |
+| 图形验证码 | 抢票前人机验证（滑动拼图等） |
+| 防重复提交 | 幂等性保障，防止重复下单 |
+| 数据加密 | 敏感数据（身份证、手机号）脱敏/加密存储 |
+
+---
+
+## 二、数据库 ER 图
+
+```mermaid
+erDiagram
+    USER {
+        bigint id PK "用户ID（雪花算法）"
+        varchar username "用户名"
+        varchar password_hash "密码哈希"
+        varchar phone "手机号（唯一）"
+        varchar email "邮箱"
+        varchar nickname "昵称"
+        varchar avatar "头像URL"
+        tinyint status "状态: 0禁用 1正常"
+        tinyint is_verified "是否实名: 0否 1是"
+        varchar real_name "真实姓名（加密）"
+        varchar id_card "身份证号（加密）"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+        datetime deleted_at "软删除时间"
+    }
+
+    TICKET_BUYER {
+        bigint id PK "购票人ID"
+        bigint user_id FK "所属用户ID"
+        varchar name "购票人姓名"
+        varchar id_card "身份证号（加密）"
+        varchar phone "联系电话"
+        tinyint is_default "是否默认: 0否 1是"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    ADDRESS {
+        bigint id PK "地址ID"
+        bigint user_id FK "所属用户ID"
+        varchar receiver_name "收件人姓名"
+        varchar receiver_phone "收件人电话"
+        varchar province "省"
+        varchar city "市"
+        varchar district "区"
+        varchar detail "详细地址"
+        tinyint is_default "是否默认"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    CATEGORY {
+        int id PK "分类ID"
+        varchar name "分类名称"
+        varchar icon "分类图标"
+        int sort_order "排序权重"
+        tinyint status "状态: 0禁用 1启用"
+    }
+
+    VENUE {
+        bigint id PK "场馆ID"
+        varchar name "场馆名称"
+        varchar city "所在城市"
+        varchar address "场馆地址"
+        int capacity "总容量"
+        varchar seat_map_url "座位图URL"
+        text description "场馆描述"
+    }
+
+    EVENT {
+        bigint id PK "活动ID"
+        varchar title "活动标题"
+        text description "活动描述"
+        varchar poster_url "海报图片URL"
+        int category_id FK "分类ID"
+        bigint venue_id FK "场馆ID"
+        varchar city "举办城市"
+        varchar artist "艺人/团体"
+        datetime event_start_time "活动开始时间"
+        datetime event_end_time "活动结束时间"
+        datetime sale_start_time "开售时间"
+        datetime sale_end_time "停售时间"
+        tinyint status "状态: 0草稿 1上架 2下架 3已结束"
+        int purchase_limit "每人限购张数"
+        tinyint need_real_name "是否需要实名: 0否 1是"
+        tinyint ticket_type "票务类型: 1电子票 2纸质票"
+        bigint created_by "创建人（管理员ID）"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+        datetime deleted_at "软删除时间"
+    }
+
+    TICKET_TIER {
+        bigint id PK "票档ID"
+        bigint event_id FK "活动ID"
+        varchar name "档位名称（如VIP、内场）"
+        decimal price "票价"
+        int total_stock "总库存"
+        int sold_count "已售数量"
+        int locked_count "锁定数量"
+        tinyint status "状态: 0停售 1在售 2售罄"
+        int sort_order "排序权重"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    EVENT_FAVORITE {
+        bigint id PK "收藏ID"
+        bigint user_id FK "用户ID"
+        bigint event_id FK "活动ID"
+        tinyint notify_enabled "开票提醒: 0关 1开"
+        datetime created_at "创建时间"
+    }
+
+    ORDER_INFO {
+        bigint id PK "订单ID（雪花算法）"
+        varchar order_no UK "订单编号"
+        bigint user_id FK "用户ID"
+        bigint event_id FK "活动ID"
+        bigint ticket_tier_id FK "票档ID"
+        int quantity "购买数量"
+        decimal unit_price "单价"
+        decimal total_amount "总金额"
+        tinyint status "状态: 0待支付 1已支付 2已取消 3退款中 4已退款 5已完成"
+        tinyint cancel_reason "取消原因: 0无 1用户取消 2超时取消 3管理员取消"
+        datetime pay_deadline "支付截止时间"
+        datetime paid_at "支付时间"
+        datetime cancelled_at "取消时间"
+        bigint address_id FK "收货地址ID（纸质票）"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    ORDER_TICKET {
+        bigint id PK "子项ID"
+        bigint order_id FK "订单ID"
+        bigint ticket_buyer_id FK "购票人ID"
+        varchar ticket_code UK "电子票码（唯一）"
+        varchar qr_code_url "二维码图片URL"
+        tinyint status "状态: 0未使用 1已使用 2已退票"
+        varchar seat_info "座位信息"
+        datetime verified_at "验票时间"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    PAYMENT {
+        bigint id PK "支付记录ID"
+        varchar payment_no UK "支付流水号"
+        bigint order_id FK "关联订单ID"
+        bigint user_id FK "用户ID"
+        tinyint pay_method "支付方式: 1支付宝 2微信"
+        decimal amount "支付金额"
+        tinyint status "状态: 0待支付 1支付成功 2支付失败"
+        varchar trade_no "第三方交易号"
+        datetime paid_at "支付完成时间"
+        text callback_data "支付回调原始数据"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    REFUND {
+        bigint id PK "退款记录ID"
+        varchar refund_no UK "退款流水号"
+        bigint order_id FK "关联订单ID"
+        bigint payment_id FK "关联支付ID"
+        bigint user_id FK "用户ID"
+        decimal refund_amount "退款金额"
+        tinyint status "状态: 0待审核 1审核通过 2退款中 3退款成功 4退款失败 5审核拒绝"
+        varchar reason "退款原因"
+        varchar reject_reason "拒绝原因"
+        varchar trade_no "第三方退款号"
+        bigint audited_by "审核管理员ID"
+        datetime audited_at "审核时间"
+        datetime refunded_at "退款完成时间"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    NOTIFICATION {
+        bigint id PK "通知ID"
+        bigint user_id FK "接收用户ID"
+        tinyint type "类型: 1系统公告 2订单通知 3开票提醒 4抢票结果"
+        varchar title "通知标题"
+        text content "通知内容"
+        tinyint is_read "是否已读: 0否 1是"
+        datetime created_at "创建时间"
+    }
+
+    ADMIN_USER {
+        bigint id PK "管理员ID"
+        varchar username "用户名"
+        varchar password_hash "密码哈希"
+        varchar real_name "真实姓名"
+        varchar phone "手机号"
+        tinyint role "角色: 1超级管理员 2运营 3客服"
+        tinyint status "状态: 0禁用 1正常"
+        datetime created_at "创建时间"
+        datetime updated_at "更新时间"
+    }
+
+    ADMIN_LOG {
+        bigint id PK "日志ID"
+        bigint admin_id FK "管理员ID"
+        varchar action "操作类型"
+        varchar target_type "操作对象类型"
+        bigint target_id "操作对象ID"
+        text detail "操作详情JSON"
+        varchar ip "操作IP"
+        datetime created_at "操作时间"
+    }
+
+    %% ===== 关系定义 =====
+    USER ||--o{ TICKET_BUYER : "管理购票人"
+    USER ||--o{ ADDRESS : "管理收货地址"
+    USER ||--o{ ORDER_INFO : "创建订单"
+    USER ||--o{ EVENT_FAVORITE : "收藏活动"
+    USER ||--o{ NOTIFICATION : "接收通知"
+    USER ||--o{ PAYMENT : "发起支付"
+    USER ||--o{ REFUND : "申请退款"
+
+    CATEGORY ||--o{ EVENT : "分类下活动"
+    VENUE ||--o{ EVENT : "场馆承办"
+
+    EVENT ||--o{ TICKET_TIER : "包含票档"
+    EVENT ||--o{ EVENT_FAVORITE : "被用户收藏"
+    EVENT ||--o{ ORDER_INFO : "关联订单"
+
+    TICKET_TIER ||--o{ ORDER_INFO : "对应订单"
+
+    ORDER_INFO ||--o{ ORDER_TICKET : "包含电子票"
+    ORDER_INFO ||--o| PAYMENT : "关联支付"
+    ORDER_INFO ||--o| REFUND : "关联退款"
+    ORDER_INFO }o--o| ADDRESS : "关联地址"
+
+    ORDER_TICKET }o--|| TICKET_BUYER : "对应购票人"
+
+    PAYMENT ||--o| REFUND : "关联退款"
+
+    ADMIN_USER ||--o{ ADMIN_LOG : "操作日志"
+    ADMIN_USER ||--o{ EVENT : "创建活动"
+    ADMIN_USER ||--o{ REFUND : "审核退款"
+```
+
+---
+
+## 三、ER 图实体关系详解
+
+### 🧑 用户域
+
+| 实体 | 说明 |
+|------|------|
+| **USER** | 核心用户表，存储账号、认证、实名信息。使用雪花算法生成 ID，手机号唯一索引。身份证号和真实姓名使用 AES 加密存储。 |
+| **TICKET_BUYER** | 购票人（观演人）表。一个用户可以管理多个购票人（为家人/朋友代购），每张电子票绑定一个购票人。 |
+| **ADDRESS** | 收货地址表。纸质票场景下需要邮寄，支持多地址和默认地址。 |
+
+> [!NOTE]
+> **USER → TICKET_BUYER**：一对多关系。用户可添加多个购票人用于代购场景。  
+> **USER → ADDRESS**：一对多关系。用户可维护多个收货地址。
+
+### 🎭 活动域
+
+| 实体 | 说明 |
+|------|------|
+| **CATEGORY** | 活动分类表（演唱会、话剧、体育赛事等），支持排序和启停。 |
+| **VENUE** | 演出场馆表，包含场馆名称、地址、容量和座位图信息。 |
+| **EVENT** | 活动主表，是业务核心。关联分类和场馆，记录活动时间、开售时间、限购数、是否实名等。状态流转：草稿 → 上架 → 下架/已结束。 |
+| **TICKET_TIER** | 票档表（票价档位）。一个活动可设置多个票档（如：VIP 1280元、内场 880元、看台 480元），每个票档独立管理库存。 |
+| **EVENT_FAVORITE** | 用户收藏/关注表。用户可收藏感兴趣的活动，并开启开票提醒。 |
+
+> [!TIP]
+> **EVENT → TICKET_TIER**：一对多关系。这是库存管理的核心，每个票档独立控制 `total_stock` / `sold_count` / `locked_count`，配合 Redis 做预扣库存。
+
+### 📦 订单域
+
+| 实体 | 说明 |
+|------|------|
+| **ORDER_INFO** | 订单主表。记录用户购买的票档、数量、金额、支付状态。订单号使用日期+随机数规则生成，便于业务追溯。包含支付截止时间，触发延迟队列自动取消。 |
+| **ORDER_TICKET** | 电子票明细表。一个订单购买 N 张票，就会生成 N 条记录，每条绑定一个购票人。生成唯一的 `ticket_code` 和二维码用于验票入场。 |
+
+> [!IMPORTANT]
+> **订单状态流转**：待支付 → 已支付 → 已完成（正常流程）；待支付 → 已取消（超时/手动）；已支付 → 退款中 → 已退款。  
+> **ORDER_INFO → ORDER_TICKET**：一对多关系。买 3 张票就产生 3 条 ORDER_TICKET 记录，每张票独立管理使用状态。
+
+### 💰 支付域
+
+| 实体 | 说明 |
+|------|------|
+| **PAYMENT** | 支付流水表。记录每笔支付的方式、金额、第三方交易号和回调数据。与订单一对一关系。 |
+| **REFUND** | 退款流水表。关联订单和支付记录，记录退款审核流程（待审核 → 审核通过 → 退款中 → 退款成功/失败）。 |
+
+> [!NOTE]
+> **ORDER_INFO → PAYMENT**：一对一关系。一个订单对应一笔支付。  
+> **PAYMENT → REFUND**：一对一关系。退款必须基于已有支付记录。
+
+### 🔔 通知域
+
+| 实体 | 说明 |
+|------|------|
+| **NOTIFICATION** | 站内通知表。支持系统公告、订单状态变更、开票提醒、抢票结果等多种通知类型。 |
+
+### 🛡 管理后台域
+
+| 实体 | 说明 |
+|------|------|
+| **ADMIN_USER** | 管理员表。支持超级管理员、运营、客服三种角色。 |
+| **ADMIN_LOG** | 管理员操作日志表。记录所有关键操作（创建活动、审核退款、封禁用户等），用于审计追溯。 |
+
+---
+
+## 四、技术架构总览
+
+### 系统架构图
+
+```mermaid
+graph TB
+    subgraph 客户端["🖥 客户端"]
+        WEB["Vue3 Web 端"]
+        H5["H5 移动端"]
+    end
+
+    subgraph 网关层["🌐 网关层"]
+        NGINX["Nginx 负载均衡"]
+        GATEWAY["Go-Zero API Gateway"]
+    end
+
+    subgraph 服务层["⚙️ 微服务层 (go-zero RPC)"]
+        USER_SVC["用户服务"]
+        EVENT_SVC["活动服务"]
+        TICKET_SVC["票务服务（核心）"]
+        ORDER_SVC["订单服务"]
+        PAY_SVC["支付服务"]
+        NOTIFY_SVC["通知服务"]
+        ADMIN_SVC["后台管理服务"]
+    end
+
+    subgraph 中间件层["🔧 中间件层"]
+        REDIS["Redis Cluster<br/>库存预扣/分布式锁/限流/缓存"]
+        KAFKA["Kafka<br/>异步下单/延迟取消/通知"]
+        ETCD["Etcd<br/>服务注册发现"]
+    end
+
+    subgraph 数据层["💾 数据层"]
+        MYSQL["MySQL 主从集群<br/>GORM ORM"]
+        ES["Elasticsearch<br/>活动搜索（可选）"]
+    end
+
+    subgraph 外部服务["🔗 外部服务"]
+        ALIPAY["支付宝"]
+        WECHAT["微信支付"]
+        SMS["短信服务"]
+        OSS["OSS 对象存储"]
+    end
+
+    WEB --> NGINX
+    H5 --> NGINX
+    NGINX --> GATEWAY
+    GATEWAY --> USER_SVC
+    GATEWAY --> EVENT_SVC
+    GATEWAY --> TICKET_SVC
+    GATEWAY --> ORDER_SVC
+    GATEWAY --> PAY_SVC
+    GATEWAY --> NOTIFY_SVC
+    GATEWAY --> ADMIN_SVC
+
+    USER_SVC --> REDIS
+    USER_SVC --> MYSQL
+    EVENT_SVC --> REDIS
+    EVENT_SVC --> MYSQL
+    EVENT_SVC --> ES
+    TICKET_SVC --> REDIS
+    TICKET_SVC --> KAFKA
+    TICKET_SVC --> MYSQL
+    ORDER_SVC --> REDIS
+    ORDER_SVC --> KAFKA
+    ORDER_SVC --> MYSQL
+    PAY_SVC --> MYSQL
+    PAY_SVC --> ALIPAY
+    PAY_SVC --> WECHAT
+    NOTIFY_SVC --> KAFKA
+    NOTIFY_SVC --> SMS
+    ADMIN_SVC --> MYSQL
+
+    TICKET_SVC -.-> ORDER_SVC
+    ORDER_SVC -.-> PAY_SVC
+    PAY_SVC -.-> NOTIFY_SVC
+```
+
+---
+
+### 后端技术栈详解
+
+| 技术 | 用途 | 说明 |
+|------|------|------|
+| **go-zero** | 微服务框架 | 内置 API 网关、RPC 通信 (gRPC)、服务发现 (etcd)、熔断限流、链路追踪、代码生成 (goctl)。天然适合高并发场景 |
+| **GORM** | ORM 框架 | 数据库表映射、自动迁移、软删除、Hook、关联预加载。配合 MySQL 使用 |
+| **MySQL** | 主数据库 | 存储核心业务数据。建议**主从架构**读写分离，GORM 的 DBResolver 可原生支持 |
+| **Redis** | 缓存/限流/分布式锁 | **核心角色**：① 库存预扣（Lua 脚本原子操作）② 分布式锁（座位锁定）③ 接口限流（令牌桶）④ 热点数据缓存 ⑤ 排队计数器 |
+| **Kafka** | 消息队列 | **核心角色**：① 抢票请求异步化（削峰填谷）② 订单超时延迟取消 ③ 支付结果异步处理 ④ 通知消息发送 |
+| **Etcd** | 服务注册发现 | go-zero 内置支持，服务自动注册和健康检查 |
+| **Elasticsearch** | 全文搜索（可选） | 活动搜索、关键词匹配，应对复杂搜索场景 |
+
+#### 🔑 抢票核心流程
+
+```mermaid
+sequenceDiagram
+    participant U as 用户
+    participant GW as API Gateway
+    participant TS as 票务服务
+    participant R as Redis
+    participant K as Kafka
+    participant OS as 订单服务
+    participant DB as MySQL
+    participant PS as 支付服务
+
+    U->>GW: 点击抢票
+    GW->>GW: 限流检查（令牌桶）
+    GW->>TS: 转发请求
+    TS->>R: Lua脚本：检查限购 + 预扣库存
+    
+    alt 库存不足
+        R-->>TS: 扣减失败
+        TS-->>U: 已售罄
+    else 库存充足
+        R-->>TS: 扣减成功
+        TS->>K: 发送下单消息（异步）
+        TS-->>U: 排队中，请等待...
+    end
+
+    K->>OS: 消费下单消息
+    OS->>DB: 创建订单 + 扣减DB库存
+    OS->>R: 设置订单15分钟过期Key
+    OS->>U: WebSocket推送：抢票成功，请支付
+
+    U->>PS: 发起支付
+    PS->>PS: 调用第三方支付
+    PS-->>OS: 支付成功回调
+    OS->>DB: 更新订单状态
+    OS->>R: 删除过期Key
+    OS->>U: 支付成功通知
+    
+    Note over R,DB: 若15分钟未支付
+    K->>OS: 延迟消息：订单超时
+    OS->>DB: 取消订单
+    OS->>R: 归还Redis库存
+```
+
+> [!WARNING]
+> **防超卖关键**：Redis Lua 脚本保证 `检查库存 + 扣减库存` 的原子性。不能先 GET 再 DECR，必须用 Lua 脚本一步完成。
+
+---
+
+### 前端技术栈详解
+
+| 技术 | 用途 | 说明 |
+|------|------|------|
+| **Vue 3** | 前端框架 | Composition API 开发，响应式数据管理。支持 `<script setup>` 语法糖 |
+| **Element Plus** | UI 组件库 | 提供丰富的表格、表单、弹窗、分页等组件，适合管理后台和用户端 |
+| **Vue Router** | 路由管理 | 支持路由守卫（鉴权拦截）、懒加载、动态路由 |
+| **Pinia** | 状态管理 | 替代 Vuex，轻量且类型友好。管理用户状态、购物车（选票）、全局通知等 |
+| **Axios** | HTTP 请求 | 封装请求/响应拦截器，统一处理 Token 注入、错误提示、Loading |
+| **Vite** | 构建工具 | 极速 HMR 开发体验，生产环境 Rollup 打包 |
+
+#### 前端项目模块划分
+
+```
+xiaomaipro-web/
+├── src/
+│   ├── api/              # API 接口层（按服务模块划分）
+│   │   ├── user.js       # 用户相关接口
+│   │   ├── event.js      # 活动相关接口
+│   │   ├── order.js      # 订单相关接口
+│   │   └── payment.js    # 支付相关接口
+│   ├── assets/           # 静态资源
+│   ├── components/       # 公共组件
+│   │   ├── EventCard.vue      # 活动卡片
+│   │   ├── TicketSelector.vue # 票档选择器
+│   │   ├── SeatMap.vue        # 座位图组件
+│   │   ├── CountDown.vue      # 倒计时组件
+│   │   └── QueueStatus.vue    # 排队状态组件
+│   ├── composables/      # 组合式函数
+│   │   ├── useAuth.js    # 认证逻辑
+│   │   ├── useWebSocket.js # WS 连接
+│   │   └── useCountDown.js # 倒计时
+│   ├── layouts/          # 布局组件
+│   ├── pages/            # 页面
+│   │   ├── Home.vue      # 首页
+│   │   ├── EventList.vue # 活动列表
+│   │   ├── EventDetail.vue # 活动详情
+│   │   ├── OrderConfirm.vue # 确认订单
+│   │   ├── OrderList.vue    # 我的订单
+│   │   ├── Payment.vue      # 支付页
+│   │   └── User/             # 个人中心
+│   ├── router/           # 路由配置
+│   ├── stores/           # Pinia 状态管理
+│   │   ├── user.js       # 用户状态
+│   │   ├── cart.js       # 选票状态
+│   │   └── app.js        # 全局状态
+│   ├── styles/           # 全局样式
+│   ├── utils/            # 工具函数
+│   │   ├── request.js    # Axios 封装
+│   │   ├── auth.js       # Token 管理
+│   │   └── format.js     # 格式化工具
+│   ├── App.vue
+│   └── main.js
+├── admin/                # 管理后台（独立 SPA）
+│   ├── src/
+│   │   ├── pages/
+│   │   │   ├── Dashboard.vue  # 数据面板
+│   │   │   ├── EventManage.vue # 活动管理
+│   │   │   ├── OrderManage.vue # 订单管理
+│   │   │   └── UserManage.vue  # 用户管理
+│   │   └── ...
+│   └── ...
+└── package.json
+```
+
+---
+
+## 五、关键设计决策
+
+### 1. 高并发抢票策略
+
+```
+请求 → Nginx限流 → API网关限流 → Redis库存预扣 → Kafka异步下单 → MySQL落库
+```
+
+- **三级限流**：Nginx（连接级）→ API 网关（用户级）→ Redis（接口级）
+- **库存预扣**：Redis Lua 脚本实现原子扣减，避免数据库压力
+- **异步下单**：Kafka 消息队列削峰填谷，实际下单在消费者中完成
+- **库存预热**：开票前 10 分钟，定时任务将库存 Load 进 Redis
+
+### 2. 数据一致性保障
+
+| 场景 | 方案 |
+|------|------|
+| Redis 库存与 MySQL 不一致 | Kafka 最终一致性 + 对账定时任务 |
+| 超时未支付库存归还 | Kafka 延迟消息 + Redis 归还 + MySQL 回滚 |
+| 重复扣减 | Redis 幂等 Key（`seckill:{userId}:{eventId}`） |
+| 支付回调丢失 | 定时轮询第三方支付状态 |
+
+### 3. MySQL 分库分表策略（10万级并发参考）
+
+| 表 | 分片策略 |
+|------|------|
+| ORDER_INFO | 按 `user_id` 哈希分 16 表 |
+| ORDER_TICKET | 按 `order_id` 与订单同库 |
+| PAYMENT / REFUND | 按 `order_id` 与订单同库 |
+| EVENT / TICKET_TIER | 不分片，数据量可控 |
+
+> [!TIP]
+> 初期可以先不分库分表，使用 **MySQL 读写分离 + Redis 缓存** 即可支撑 10 万级并发。当单表数据量超过 **500 万行** 时再考虑分库分表。
+
+---
+
+## 六、部署架构建议
+
+```
+                        ┌──────────────────────────┐
+                        │     CDN (静态资源)         │
+                        └─────────┬────────────────┘
+                                  │
+                        ┌─────────▼────────────────┐
+                        │   Nginx 集群 (2+台)       │
+                        │   负载均衡 + SSL           │
+                        └─────────┬────────────────┘
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │   go-zero API Gateway (3+台) │
+                    │   限流 / 鉴权 / 路由          │
+                    └─────────────┬──────────────┘
+                                  │
+            ┌──────────┬──────────┼──────────┬──────────┐
+            ▼          ▼          ▼          ▼          ▼
+       用户服务    活动服务    票务服务    订单服务    支付服务
+       (2台)      (2台)      (4+台)     (4+台)     (2台)
+            │          │          │          │          │
+            └──────────┴──────────┼──────────┴──────────┘
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │        中间件集群            │
+                    │  Redis (6节点 Cluster)       │
+                    │  Kafka (3 Broker)             │
+                    │  Etcd  (3节点)                │
+                    └─────────────┬──────────────┘
+                                  │
+                    ┌─────────────▼──────────────┐
+                    │  MySQL 主从 (1主2从)          │
+                    │  主节点：写入                  │
+                    │  从节点：读取                  │
+                    └──────────────────────────────┘
+```
+
+> [!CAUTION]
+> 票务服务和订单服务是抢票场景的核心链路，建议至少 **4 台以上** 部署，并配合 **水平自动伸缩 (HPA)** 在流量高峰时动态扩容。
+
+---
+
+## 七、补充章节：高并发上线保障能力（建议新增）
+
+> [!IMPORTANT]
+> 以下能力用于将当前方案从“可设计”提升到“可上线、可压测、可运维”。
+
+### 1. 容量目标与 SLO（新增）
+
+| 指标 | 建议目标 | 说明 |
+|------|------|------|
+| 峰值并发在线 | 100,000 | 指同时在线用户规模 |
+| 抢票入口峰值 QPS | 20,000+ | 需结合活动热度压测校准 |
+| 下单成功链路 P95 | < 800ms | 从网关到“进入排队/抢票结果返回” |
+| 支付回调成功率 | >= 99.99% | 含补偿机制后的最终成功率 |
+| 核心链路可用性 | >= 99.95% | 票务、订单、支付三条核心链路 |
+
+### 2. 抢票准入与排队令牌（新增核心功能）
+
+| 功能 | 设计要点 |
+|------|------|
+| 排队令牌 `queue_token` | 用户先取号再抢票，令牌短时有效（如 30~60 秒） |
+| 令牌校验 | 抢票接口必须携带令牌，防止绕过排队直接打库存接口 |
+| 分层准入 | 活动级、票档级、用户级三层阈值控制，支持动态调参 |
+| 排队可视化 | 返回队列位置、预计等待时间、当前放行速率 |
+
+### 3. 消息可靠性与幂等机制（新增）
+
+| 场景 | 建议方案 |
+|------|------|
+| 下单消息不丢失 | Kafka `acks=all` + 幂等生产者 + 重试策略 |
+| 消费重复 | 消费端幂等表 + 业务唯一键（如 `eventId+userId+requestId`） |
+| 消费失败堆积 | 重试队列 + 死信队列（DLQ）+ 人工补偿任务 |
+| 本地事务与消息一致性 | Outbox 模式（本地落库后异步投递） |
+
+### 4. 库存账本与自动对账（新增）
+
+| 功能 | 设计要点 |
+|------|------|
+| 库存流水账本 | 每次预扣、确认、释放都写 `stock_ledger` |
+| 自动对账任务 | 定时比对 Redis 库存、MySQL 库存、账本汇总 |
+| 差异告警 | 差异超过阈值立即告警并触发自动修复流程 |
+| 回放能力 | 按活动/票档回放库存变化，支持审计追踪 |
+
+### 5. 降级、熔断与应急开关（新增）
+
+| 场景 | 降级策略 |
+|------|------|
+| Redis 异常 | 暂停抢票写操作，仅保留活动浏览与订单查询 |
+| Kafka 异常 | 关闭新下单入口，保留支付与订单查询 |
+| MySQL 主库抖动 | 快速失败 + 熔断 + 限流收敛，避免雪崩 |
+| 突发流量 | 启用强制排队模式，提高准入门槛 |
+
+### 6. 可观测性与告警体系（新增）
+
+| 维度 | 关键指标 |
+|------|------|
+| 流量 | QPS、并发连接数、429 比例、排队深度 |
+| 库存 | 预扣成功率、超卖拦截数、库存差异值 |
+| 消息 | 生产失败率、消费延迟、DLQ 积压 |
+| 订单支付 | 下单成功率、支付成功率、超时取消率 |
+| 系统 | CPU/内存、GC、慢 SQL、Redis/Kafka 延迟 |
+
+> [!TIP]
+> 建议统一接入 Prometheus + Grafana + OpenTelemetry，按“活动ID/票档ID/请求ID”贯通日志与链路追踪。
+
+### 7. 压测与故障演练门槛（新增）
+
+| 项目 | 最低通过标准 |
+|------|------|
+| 全链路压测 | 在目标流量下连续 30 分钟无超卖、无大面积超时 |
+| 容灾演练 | Redis/Kafka/MySQL 单点故障可在预期时间内恢复 |
+| 支付补偿演练 | 回调丢失场景可通过轮询与补偿闭环修复 |
+| 发布回滚演练 | 灰度发布可在分钟级回滚且不丢核心交易数据 |
+
+### 8. 数据模型补充建议（新增表）
+
+| 表名 | 用途 | 核心字段建议 |
+|------|------|------|
+| `queue_ticket` | 排队凭证与状态跟踪 | `queue_no` `user_id` `event_id` `status` `expire_at` |
+| `idempotency_record` | 防重复提交与请求去重 | `idempotency_key` `biz_type` `result_snapshot` |
+| `stock_ledger` | 库存变更流水 | `event_id` `ticket_tier_id` `change_type` `delta` `trace_id` |
+| `outbox_event` | 本地事务消息外发 | `event_type` `aggregate_id` `payload` `publish_status` |
+| `dead_letter_message` | 异常消息追踪与补偿 | `topic` `message_key` `error_reason` `retry_count` |
+
+### 9. 实施优先级建议（新增）
+
+1. 第一阶段（必须）：排队令牌、幂等体系、DLQ、库存账本、核心告警。
+2. 第二阶段（增强）：Outbox、自动对账修复、应急开关平台、灰度与回滚自动化。
+3. 第三阶段（优化）：多活容灾、精细化风控策略、智能流量调度。

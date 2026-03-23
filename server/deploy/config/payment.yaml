@@ -1,0 +1,43 @@
+Name: payment.rpc
+ListenOn: 0.0.0.0:8084
+Timeout: ${PAYMENT_RPC_TIMEOUT_MS}
+
+Etcd:
+  Hosts:
+    - "${ETCD_ENDPOINT}"
+  Key: payment.rpc
+
+DB:
+  DSN: "${POSTGRES_DSN}"
+
+RedisConfig:
+  Host: "${REDIS_ADDR}"
+  Password: "${REDIS_PASSWORD}"
+  DB: ${REDIS_DB}
+
+Pay:
+  NotifySuccessResult: "${PAY_NOTIFY_SUCCESS_RESULT}"
+  NotifyFailureResult: "${PAY_NOTIFY_FAILURE_RESULT}"
+  DefaultPayScene: "${PAY_DEFAULT_SCENE}"
+  DefaultChannel: "${PAY_DEFAULT_CHANNEL}"
+
+Business:
+  RefundDeadlineHours: ${PAY_REFUND_DEADLINE_HOURS}
+
+Stripe:
+  SecretKey: "${STRIPE_SECRET_KEY}"
+  WebhookSecret: "${STRIPE_WEBHOOK_SECRET}"
+  SuccessURL: "${STRIPE_SUCCESS_URL}"
+  CancelURL: "${STRIPE_CANCEL_URL}"
+  Currency: "${STRIPE_CURRENCY}"
+  PaymentMethodTypes:
+    - "${STRIPE_PAYMENT_METHOD_PRIMARY}"
+  CheckoutExpireMinutes: ${STRIPE_CHECKOUT_EXPIRE_MINUTES}
+  RequestTimeoutSeconds: ${STRIPE_REQUEST_TIMEOUT_SECONDS}
+
+Lock:
+  TTLSeconds: ${LOCK_TTL_SECONDS}
+  RetryTimes: ${LOCK_RETRY_TIMES}
+  RetryIntervalMillis: ${LOCK_RETRY_INTERVAL_MILLIS}
+
+KeyPrefix: "${PAYMENT_KEY_PREFIX}"

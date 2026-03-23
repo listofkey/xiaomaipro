@@ -1,0 +1,33 @@
+Name: gateway-api
+Host: 0.0.0.0
+Port: 8080
+
+UserRpc:
+  Etcd:
+    Hosts:
+      - "${ETCD_ENDPOINT}"
+    Key: user.rpc
+  Timeout: 0
+
+ProgramRpc:
+  Etcd:
+    Hosts:
+      - "${ETCD_ENDPOINT}"
+    Key: program.rpc
+  Timeout: 0
+
+OrderRpc:
+  Etcd:
+    Hosts:
+      - "${ETCD_ENDPOINT}"
+    Key: order.rpc
+  Timeout: 0
+
+PaymentRpc:
+  Etcd:
+    Hosts:
+      - "${ETCD_ENDPOINT}"
+    Key: payment.rpc
+  Timeout: 0
+
+Timeout: 0

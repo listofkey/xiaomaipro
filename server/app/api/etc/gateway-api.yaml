@@ -1,0 +1,30 @@
+Name: gateway-api
+Host: 0.0.0.0
+Port: 8080
+
+UserRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: user.rpc
+  Timeout: 0
+
+ProgramRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: program.rpc
+  Timeout: 0
+OrderRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: order.rpc
+  Timeout: 0
+PaymentRpc:
+  Etcd:
+    Hosts:
+      - 127.0.0.1:2379
+    Key: payment.rpc
+  Timeout: 0
+Timeout: 0

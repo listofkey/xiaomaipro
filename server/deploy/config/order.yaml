@@ -1,0 +1,45 @@
+Name: order.rpc
+ListenOn: 0.0.0.0:8083
+Timeout: ${ORDER_RPC_TIMEOUT_MS}
+
+Etcd:
+  Hosts:
+    - "${ETCD_ENDPOINT}"
+  Key: order.rpc
+
+DB:
+  DSN: "${POSTGRES_DSN}"
+
+RedisConfig:
+  Host: "${REDIS_ADDR}"
+  Password: "${REDIS_PASSWORD}"
+  DB: ${REDIS_DB}
+
+PaymentRpc:
+  Etcd:
+    Hosts:
+      - "${ETCD_ENDPOINT}"
+    Key: payment.rpc
+  Timeout: 0
+
+Pay:
+  NotifySuccessResult: "${PAY_NOTIFY_SUCCESS_RESULT}"
+  MockPayFormTemplate: "${PAY_MOCK_FORM_TEMPLATE}"
+
+Kafka:
+  Enabled: ${KAFKA_ENABLED}
+  Brokers:
+    - "${KAFKA_ADDR}"
+  Topic: "${KAFKA_TOPIC}"
+  GroupID: "${KAFKA_GROUP_ID}"
+
+Order:
+  PayTimeoutMinutes: ${ORDER_PAY_TIMEOUT_MINUTES}
+  QueueStatusTTLMinutes: ${ORDER_QUEUE_STATUS_TTL_MINUTES}
+  InventoryTTLHours: ${ORDER_INVENTORY_TTL_HOURS}
+  PurchaseCounterTTLHours: ${ORDER_PURCHASE_COUNTER_TTL_HOURS}
+  RefundDeadlineHours: ${ORDER_REFUND_DEADLINE_HOURS}
+  AutoCancelIntervalSeconds: ${ORDER_AUTO_CANCEL_INTERVAL_SECONDS}
+  LocalAsyncBuffer: ${ORDER_LOCAL_ASYNC_BUFFER}
+
+KeyPrefix: "${ORDER_KEY_PREFIX}"

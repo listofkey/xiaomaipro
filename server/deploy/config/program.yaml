@@ -1,0 +1,15 @@
+Name: program.rpc
+ListenOn: 0.0.0.0:8082
+
+Etcd:
+  Hosts:
+    - "${ETCD_ENDPOINT}"
+  Key: program.rpc
+
+DB:
+  DSN: "${POSTGRES_DSN}"
+
+RedisConfig:
+  Host: "${REDIS_ADDR}"
+  Password: "${REDIS_PASSWORD}"
+  DB: ${REDIS_DB}

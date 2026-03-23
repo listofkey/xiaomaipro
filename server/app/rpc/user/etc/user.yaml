@@ -1,0 +1,21 @@
+Name: user.rpc
+ListenOn: 0.0.0.0:8081
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: user.rpc
+DB:
+  DSN: "host=127.0.0.1 user=root password=123456 dbname=xiaomaipro port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+RedisConfig:
+  Host: "127.0.0.1:6379"
+  Password: ""
+  DB: 0
+
+JWT:
+  AccessSecret: "your-access-secret-key-32bytes!!"
+  AccessExpire: 7200
+  RefreshExpire: 604800
+
+AES:
+  Key: "0123456789abcdef0123456789abcdef"

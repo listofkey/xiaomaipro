@@ -1,0 +1,44 @@
+Name: payment.rpc
+ListenOn: 0.0.0.0:8084
+# Stripe 创建 checkout session 依赖外部网络，显式高于其 45s 请求超时，
+# 避免被 go-zero gRPC server 默认 2s timeout 截断。
+Timeout: 60000
+Etcd:
+  Hosts:
+    - 127.0.0.1:2379
+  Key: payment.rpc
+
+DB:
+  DSN: "host=127.0.0.1 user=root password=123456 dbname=xiaomaipro port=5432 sslmode=disable TimeZone=Asia/Shanghai"
+
+RedisConfig:
+  Host: 127.0.0.1:6379
+  Password: ""
+  DB: 0
+
+Pay:
+  NotifySuccessResult: "success"
+  NotifyFailureResult: "failure"
+  DefaultPayScene: "order"
+  DefaultChannel: "stripe"
+
+Business:
+  RefundDeadlineHours: 24
+
+Stripe:
+  SecretKey: "${STRIPE_SECRET_KEY}"
+  WebhookSecret: "${STRIPE_WEBHOOK_SECRET}"
+  SuccessURL: "http://localhost:9998/payment/processing"
+  CancelURL: "http://localhost:9998/order/list"
+  Currency: "cny"
+  PaymentMethodTypes:
+    - "card"
+  CheckoutExpireMinutes: 30
+  RequestTimeoutSeconds: 45
+
+Lock:
+  TTLSeconds: 5
+  RetryTimes: 20
+  RetryIntervalMillis: 50
+
+KeyPrefix: "xiaomaipro:payment"
