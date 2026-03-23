@@ -15,6 +15,7 @@ This repository now verifies the Go and Vue projects, builds Docker images in Gi
 ## Optional GitHub Variables
 
 - `DOCKERHUB_NAMESPACE`: Docker Hub namespace or organization name
+- `DEPLOY_PROFILE`: set to `1g` for the lightweight VPS profile
 
 If `DOCKERHUB_NAMESPACE` is not set, the workflow uses `DOCKERHUB_USERNAME`.
 
@@ -30,6 +31,15 @@ If `DOCKERHUB_NAMESPACE` is not set, the workflow uses `DOCKERHUB_USERNAME`.
 2. Update `deploy/.env` on the VPS with real runtime secrets and domain values
 3. GitHub Actions only syncs the `deploy/` directory to the VPS
 4. Each deployment pulls the tagged application images from Docker Hub and restarts the stack
+
+## 1G VPS
+
+For a `1 vCPU / 1 GB RAM` VPS, use the lightweight override:
+
+- `deploy/docker-compose.1g.yml`
+- `deploy/scripts/deploy-1g.sh`
+
+This profile disables Kafka and RabbitMQ, keeps Redis/PostgreSQL on smaller settings, and relies on the order service local async fallback instead of Kafka.
 
 ## Database Initialization
 
