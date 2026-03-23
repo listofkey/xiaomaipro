@@ -80,6 +80,7 @@ jobs:
         run: |
           cp deploy/.env.example deploy/.env
           docker compose --env-file deploy/.env -f deploy/docker-compose.prod.yml config > /dev/null
+          docker compose --env-file deploy/.env -f deploy/docker-compose.1g.yml config > /dev/null
           rm -f deploy/.env
 
   publish-images:
@@ -167,6 +168,69 @@ jobs:
       VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
       DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+      APP_HTTP_BIND_IP: ${{ vars.APP_HTTP_BIND_IP }}
+      APP_HTTP_PORT: ${{ vars.APP_HTTP_PORT }}
+      FRONT_VITE_API_BASE_URL: ${{ vars.FRONT_VITE_API_BASE_URL }}
+      ADMIN_BASE_PATH: ${{ vars.ADMIN_BASE_PATH }}
+      TZ: ${{ vars.TZ }}
+      ETCD_BIND_IP: ${{ vars.ETCD_BIND_IP }}
+      ETCD_CLIENT_PORT: ${{ vars.ETCD_CLIENT_PORT }}
+      POSTGRES_BIND_IP: ${{ vars.POSTGRES_BIND_IP }}
+      POSTGRES_PORT: ${{ vars.POSTGRES_PORT }}
+      REDIS_BIND_IP: ${{ vars.REDIS_BIND_IP }}
+      REDIS_PORT: ${{ vars.REDIS_PORT }}
+      RABBITMQ_BIND_IP: ${{ vars.RABBITMQ_BIND_IP }}
+      RABBITMQ_PORT: ${{ vars.RABBITMQ_PORT }}
+      RABBITMQ_MANAGEMENT_PORT: ${{ vars.RABBITMQ_MANAGEMENT_PORT }}
+      KAFKA_BIND_IP: ${{ vars.KAFKA_BIND_IP }}
+      KAFKA_EXTERNAL_PORT: ${{ vars.KAFKA_EXTERNAL_PORT }}
+      KAFKA_EXTERNAL_ADVERTISED_HOST: ${{ vars.KAFKA_EXTERNAL_ADVERTISED_HOST }}
+      POSTGRES_DB: ${{ vars.POSTGRES_DB }}
+      POSTGRES_USER: ${{ vars.POSTGRES_USER }}
+      POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
+      POSTGRES_DSN: ${{ secrets.POSTGRES_DSN }}
+      REDIS_ADDR: ${{ vars.REDIS_ADDR }}
+      REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+      REDIS_DB: ${{ vars.REDIS_DB }}
+      ETCD_ENDPOINT: ${{ vars.ETCD_ENDPOINT }}
+      KAFKA_ENABLED: ${{ vars.KAFKA_ENABLED }}
+      KAFKA_ADDR: ${{ vars.KAFKA_ADDR }}
+      KAFKA_TOPIC: ${{ vars.KAFKA_TOPIC }}
+      KAFKA_GROUP_ID: ${{ vars.KAFKA_GROUP_ID }}
+      RABBITMQ_DEFAULT_USER: ${{ vars.RABBITMQ_DEFAULT_USER }}
+      RABBITMQ_DEFAULT_PASS: ${{ secrets.RABBITMQ_DEFAULT_PASS }}
+      JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET }}
+      JWT_ACCESS_EXPIRE: ${{ vars.JWT_ACCESS_EXPIRE }}
+      JWT_REFRESH_EXPIRE: ${{ vars.JWT_REFRESH_EXPIRE }}
+      AES_KEY: ${{ secrets.AES_KEY }}
+      ORDER_RPC_TIMEOUT_MS: ${{ vars.ORDER_RPC_TIMEOUT_MS }}
+      ORDER_KEY_PREFIX: ${{ vars.ORDER_KEY_PREFIX }}
+      ORDER_PAY_TIMEOUT_MINUTES: ${{ vars.ORDER_PAY_TIMEOUT_MINUTES }}
+      ORDER_QUEUE_STATUS_TTL_MINUTES: ${{ vars.ORDER_QUEUE_STATUS_TTL_MINUTES }}
+      ORDER_INVENTORY_TTL_HOURS: ${{ vars.ORDER_INVENTORY_TTL_HOURS }}
+      ORDER_PURCHASE_COUNTER_TTL_HOURS: ${{ vars.ORDER_PURCHASE_COUNTER_TTL_HOURS }}
+      ORDER_REFUND_DEADLINE_HOURS: ${{ vars.ORDER_REFUND_DEADLINE_HOURS }}
+      ORDER_AUTO_CANCEL_INTERVAL_SECONDS: ${{ vars.ORDER_AUTO_CANCEL_INTERVAL_SECONDS }}
+      ORDER_LOCAL_ASYNC_BUFFER: ${{ vars.ORDER_LOCAL_ASYNC_BUFFER }}
+      PAY_NOTIFY_SUCCESS_RESULT: ${{ vars.PAY_NOTIFY_SUCCESS_RESULT }}
+      PAY_MOCK_FORM_TEMPLATE: ${{ vars.PAY_MOCK_FORM_TEMPLATE }}
+      PAYMENT_RPC_TIMEOUT_MS: ${{ vars.PAYMENT_RPC_TIMEOUT_MS }}
+      PAYMENT_KEY_PREFIX: ${{ vars.PAYMENT_KEY_PREFIX }}
+      PAY_NOTIFY_FAILURE_RESULT: ${{ vars.PAY_NOTIFY_FAILURE_RESULT }}
+      PAY_DEFAULT_SCENE: ${{ vars.PAY_DEFAULT_SCENE }}
+      PAY_DEFAULT_CHANNEL: ${{ vars.PAY_DEFAULT_CHANNEL }}
+      PAY_REFUND_DEADLINE_HOURS: ${{ vars.PAY_REFUND_DEADLINE_HOURS }}
+      LOCK_TTL_SECONDS: ${{ vars.LOCK_TTL_SECONDS }}
+      LOCK_RETRY_TIMES: ${{ vars.LOCK_RETRY_TIMES }}
+      LOCK_RETRY_INTERVAL_MILLIS: ${{ vars.LOCK_RETRY_INTERVAL_MILLIS }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
+      STRIPE_SUCCESS_URL: ${{ vars.STRIPE_SUCCESS_URL }}
+      STRIPE_CANCEL_URL: ${{ vars.STRIPE_CANCEL_URL }}
+      STRIPE_CURRENCY: ${{ vars.STRIPE_CURRENCY }}
+      STRIPE_PAYMENT_METHOD_PRIMARY: ${{ vars.STRIPE_PAYMENT_METHOD_PRIMARY }}
+      STRIPE_CHECKOUT_EXPIRE_MINUTES: ${{ vars.STRIPE_CHECKOUT_EXPIRE_MINUTES }}
+      STRIPE_REQUEST_TIMEOUT_SECONDS: ${{ vars.STRIPE_REQUEST_TIMEOUT_SECONDS }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -181,6 +245,299 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "$PORT" "$VPS_HOST" >> ~/.ssh/known_hosts
 
+      - name: Render deploy env
+        run: |
+          set -euo pipefail
+          DEPLOY_ENV_FILE="$RUNNER_TEMP/deploy.env"
+
+          default_http_port=80
+          default_kafka_enabled=true
+          if [[ "${DEPLOY_PROFILE}" == "1g" ]]; then
+            default_http_port=8080
+            default_kafka_enabled=false
+          fi
+
+          app_http_bind_ip="${APP_HTTP_BIND_IP:-}"
+          [[ -n "$app_http_bind_ip" ]] || app_http_bind_ip="0.0.0.0"
+
+          app_http_port="${APP_HTTP_PORT:-}"
+          [[ -n "$app_http_port" ]] || app_http_port="$default_http_port"
+
+          front_vite_api_base_url="${FRONT_VITE_API_BASE_URL:-}"
+          [[ -n "$front_vite_api_base_url" ]] || front_vite_api_base_url="/api"
+
+          admin_base_path="${ADMIN_BASE_PATH:-}"
+          [[ -n "$admin_base_path" ]] || admin_base_path="/admin/"
+
+          timezone="${TZ:-}"
+          [[ -n "$timezone" ]] || timezone="Asia/Shanghai"
+
+          etcd_bind_ip="${ETCD_BIND_IP:-}"
+          [[ -n "$etcd_bind_ip" ]] || etcd_bind_ip="127.0.0.1"
+
+          etcd_client_port="${ETCD_CLIENT_PORT:-}"
+          [[ -n "$etcd_client_port" ]] || etcd_client_port="2379"
+
+          postgres_bind_ip="${POSTGRES_BIND_IP:-}"
+          [[ -n "$postgres_bind_ip" ]] || postgres_bind_ip="127.0.0.1"
+
+          postgres_port="${POSTGRES_PORT:-}"
+          [[ -n "$postgres_port" ]] || postgres_port="5432"
+
+          redis_bind_ip="${REDIS_BIND_IP:-}"
+          [[ -n "$redis_bind_ip" ]] || redis_bind_ip="127.0.0.1"
+
+          redis_port="${REDIS_PORT:-}"
+          [[ -n "$redis_port" ]] || redis_port="6379"
+
+          rabbitmq_bind_ip="${RABBITMQ_BIND_IP:-}"
+          [[ -n "$rabbitmq_bind_ip" ]] || rabbitmq_bind_ip="127.0.0.1"
+
+          rabbitmq_port="${RABBITMQ_PORT:-}"
+          [[ -n "$rabbitmq_port" ]] || rabbitmq_port="5672"
+
+          rabbitmq_management_port="${RABBITMQ_MANAGEMENT_PORT:-}"
+          [[ -n "$rabbitmq_management_port" ]] || rabbitmq_management_port="15672"
+
+          kafka_bind_ip="${KAFKA_BIND_IP:-}"
+          [[ -n "$kafka_bind_ip" ]] || kafka_bind_ip="127.0.0.1"
+
+          kafka_external_port="${KAFKA_EXTERNAL_PORT:-}"
+          [[ -n "$kafka_external_port" ]] || kafka_external_port="9092"
+
+          kafka_external_advertised_host="${KAFKA_EXTERNAL_ADVERTISED_HOST:-}"
+          [[ -n "$kafka_external_advertised_host" ]] || kafka_external_advertised_host="127.0.0.1"
+
+          postgres_db="${POSTGRES_DB:-}"
+          [[ -n "$postgres_db" ]] || postgres_db="xiaomaipro"
+
+          postgres_user="${POSTGRES_USER:-}"
+          [[ -n "$postgres_user" ]] || postgres_user="root"
+
+          postgres_password="${POSTGRES_PASSWORD:-}"
+          if [[ -z "$postgres_password" ]]; then
+            postgres_password="123456"
+            echo "::warning::POSTGRES_PASSWORD is not set; using demo default."
+          fi
+
+          postgres_dsn="${POSTGRES_DSN:-}"
+          if [[ -z "$postgres_dsn" ]]; then
+            postgres_dsn="postgres://${postgres_user}:${postgres_password}@postgres:5432/${postgres_db}?sslmode=disable&TimeZone=Asia%2FShanghai"
+          fi
+
+          redis_addr="${REDIS_ADDR:-}"
+          [[ -n "$redis_addr" ]] || redis_addr="redis:6379"
+
+          redis_password="${REDIS_PASSWORD:-}"
+
+          redis_db="${REDIS_DB:-}"
+          [[ -n "$redis_db" ]] || redis_db="0"
+
+          etcd_endpoint="${ETCD_ENDPOINT:-}"
+          [[ -n "$etcd_endpoint" ]] || etcd_endpoint="etcd:2379"
+
+          kafka_enabled="${KAFKA_ENABLED:-}"
+          [[ -n "$kafka_enabled" ]] || kafka_enabled="$default_kafka_enabled"
+
+          kafka_addr="${KAFKA_ADDR:-}"
+          [[ -n "$kafka_addr" ]] || kafka_addr="kafka:19092"
+
+          kafka_topic="${KAFKA_TOPIC:-}"
+          [[ -n "$kafka_topic" ]] || kafka_topic="xiaomaipro-order-create"
+
+          kafka_group_id="${KAFKA_GROUP_ID:-}"
+          [[ -n "$kafka_group_id" ]] || kafka_group_id="xiaomaipro-order"
+
+          rabbitmq_default_user="${RABBITMQ_DEFAULT_USER:-}"
+          [[ -n "$rabbitmq_default_user" ]] || rabbitmq_default_user="root"
+
+          rabbitmq_default_pass="${RABBITMQ_DEFAULT_PASS:-}"
+          if [[ -z "$rabbitmq_default_pass" ]]; then
+            rabbitmq_default_pass="123456"
+            echo "::warning::RABBITMQ_DEFAULT_PASS is not set; using demo default."
+          fi
+
+          jwt_access_secret="${JWT_ACCESS_SECRET:-}"
+          if [[ -z "$jwt_access_secret" ]]; then
+            jwt_access_secret="replace-with-your-access-secret"
+            echo "::warning::JWT_ACCESS_SECRET is not set; using demo default."
+          fi
+
+          jwt_access_expire="${JWT_ACCESS_EXPIRE:-}"
+          [[ -n "$jwt_access_expire" ]] || jwt_access_expire="7200"
+
+          jwt_refresh_expire="${JWT_REFRESH_EXPIRE:-}"
+          [[ -n "$jwt_refresh_expire" ]] || jwt_refresh_expire="604800"
+
+          aes_key="${AES_KEY:-}"
+          if [[ -z "$aes_key" ]]; then
+            aes_key="0123456789abcdef0123456789abcdef"
+            echo "::warning::AES_KEY is not set; using demo default."
+          fi
+
+          order_rpc_timeout_ms="${ORDER_RPC_TIMEOUT_MS:-}"
+          [[ -n "$order_rpc_timeout_ms" ]] || order_rpc_timeout_ms="70000"
+
+          order_key_prefix="${ORDER_KEY_PREFIX:-}"
+          [[ -n "$order_key_prefix" ]] || order_key_prefix="xiaomaipro:order"
+
+          order_pay_timeout_minutes="${ORDER_PAY_TIMEOUT_MINUTES:-}"
+          [[ -n "$order_pay_timeout_minutes" ]] || order_pay_timeout_minutes="15"
+
+          order_queue_status_ttl_minutes="${ORDER_QUEUE_STATUS_TTL_MINUTES:-}"
+          [[ -n "$order_queue_status_ttl_minutes" ]] || order_queue_status_ttl_minutes="30"
+
+          order_inventory_ttl_hours="${ORDER_INVENTORY_TTL_HOURS:-}"
+          [[ -n "$order_inventory_ttl_hours" ]] || order_inventory_ttl_hours="48"
+
+          order_purchase_counter_ttl_hours="${ORDER_PURCHASE_COUNTER_TTL_HOURS:-}"
+          [[ -n "$order_purchase_counter_ttl_hours" ]] || order_purchase_counter_ttl_hours="48"
+
+          order_refund_deadline_hours="${ORDER_REFUND_DEADLINE_HOURS:-}"
+          [[ -n "$order_refund_deadline_hours" ]] || order_refund_deadline_hours="24"
+
+          order_auto_cancel_interval_seconds="${ORDER_AUTO_CANCEL_INTERVAL_SECONDS:-}"
+          [[ -n "$order_auto_cancel_interval_seconds" ]] || order_auto_cancel_interval_seconds="30"
+
+          order_local_async_buffer="${ORDER_LOCAL_ASYNC_BUFFER:-}"
+          [[ -n "$order_local_async_buffer" ]] || order_local_async_buffer="1024"
+
+          pay_notify_success_result="${PAY_NOTIFY_SUCCESS_RESULT:-}"
+          [[ -n "$pay_notify_success_result" ]] || pay_notify_success_result="success"
+
+          pay_mock_form_template="${PAY_MOCK_FORM_TEMPLATE:-}"
+          [[ -n "$pay_mock_form_template" ]] || pay_mock_form_template="mock://pay/{order_no}"
+
+          payment_rpc_timeout_ms="${PAYMENT_RPC_TIMEOUT_MS:-}"
+          [[ -n "$payment_rpc_timeout_ms" ]] || payment_rpc_timeout_ms="60000"
+
+          payment_key_prefix="${PAYMENT_KEY_PREFIX:-}"
+          [[ -n "$payment_key_prefix" ]] || payment_key_prefix="xiaomaipro:payment"
+
+          pay_notify_failure_result="${PAY_NOTIFY_FAILURE_RESULT:-}"
+          [[ -n "$pay_notify_failure_result" ]] || pay_notify_failure_result="failure"
+
+          pay_default_scene="${PAY_DEFAULT_SCENE:-}"
+          [[ -n "$pay_default_scene" ]] || pay_default_scene="order"
+
+          pay_default_channel="${PAY_DEFAULT_CHANNEL:-}"
+          [[ -n "$pay_default_channel" ]] || pay_default_channel="stripe"
+
+          pay_refund_deadline_hours="${PAY_REFUND_DEADLINE_HOURS:-}"
+          [[ -n "$pay_refund_deadline_hours" ]] || pay_refund_deadline_hours="24"
+
+          lock_ttl_seconds="${LOCK_TTL_SECONDS:-}"
+          [[ -n "$lock_ttl_seconds" ]] || lock_ttl_seconds="5"
+
+          lock_retry_times="${LOCK_RETRY_TIMES:-}"
+          [[ -n "$lock_retry_times" ]] || lock_retry_times="20"
+
+          lock_retry_interval_millis="${LOCK_RETRY_INTERVAL_MILLIS:-}"
+          [[ -n "$lock_retry_interval_millis" ]] || lock_retry_interval_millis="50"
+
+          stripe_secret_key="${STRIPE_SECRET_KEY:-}"
+          stripe_webhook_secret="${STRIPE_WEBHOOK_SECRET:-}"
+
+          stripe_success_url="${STRIPE_SUCCESS_URL:-}"
+          [[ -n "$stripe_success_url" ]] || stripe_success_url="http://localhost/payment/processing"
+
+          stripe_cancel_url="${STRIPE_CANCEL_URL:-}"
+          [[ -n "$stripe_cancel_url" ]] || stripe_cancel_url="http://localhost/order/list"
+
+          stripe_currency="${STRIPE_CURRENCY:-}"
+          [[ -n "$stripe_currency" ]] || stripe_currency="cny"
+
+          stripe_payment_method_primary="${STRIPE_PAYMENT_METHOD_PRIMARY:-}"
+          [[ -n "$stripe_payment_method_primary" ]] || stripe_payment_method_primary="card"
+
+          stripe_checkout_expire_minutes="${STRIPE_CHECKOUT_EXPIRE_MINUTES:-}"
+          [[ -n "$stripe_checkout_expire_minutes" ]] || stripe_checkout_expire_minutes="30"
+
+          stripe_request_timeout_seconds="${STRIPE_REQUEST_TIMEOUT_SECONDS:-}"
+          [[ -n "$stripe_request_timeout_seconds" ]] || stripe_request_timeout_seconds="45"
+
+          cat > "$DEPLOY_ENV_FILE" <<EOF
+          DOCKERHUB_NAMESPACE=${DOCKERHUB_NAMESPACE}
+          APP_IMAGE_TAG=${IMAGE_TAG}
+          APP_HTTP_BIND_IP=${app_http_bind_ip}
+          APP_HTTP_PORT=${app_http_port}
+          FRONT_VITE_API_BASE_URL=${front_vite_api_base_url}
+          ADMIN_BASE_PATH=${admin_base_path}
+          TZ=${timezone}
+          ETCD_BIND_IP=${etcd_bind_ip}
+          ETCD_CLIENT_PORT=${etcd_client_port}
+          POSTGRES_BIND_IP=${postgres_bind_ip}
+          POSTGRES_PORT=${postgres_port}
+          REDIS_BIND_IP=${redis_bind_ip}
+          REDIS_PORT=${redis_port}
+          RABBITMQ_BIND_IP=${rabbitmq_bind_ip}
+          RABBITMQ_PORT=${rabbitmq_port}
+          RABBITMQ_MANAGEMENT_PORT=${rabbitmq_management_port}
+          KAFKA_BIND_IP=${kafka_bind_ip}
+          KAFKA_EXTERNAL_PORT=${kafka_external_port}
+          KAFKA_EXTERNAL_ADVERTISED_HOST=${kafka_external_advertised_host}
+          POSTGRES_DB=${postgres_db}
+          POSTGRES_USER=${postgres_user}
+          POSTGRES_PASSWORD=${postgres_password}
+          POSTGRES_DSN=${postgres_dsn}
+          REDIS_ADDR=${redis_addr}
+          REDIS_PASSWORD=${redis_password}
+          REDIS_DB=${redis_db}
+          ETCD_ENDPOINT=${etcd_endpoint}
+          KAFKA_ENABLED=${kafka_enabled}
+          KAFKA_ADDR=${kafka_addr}
+          KAFKA_TOPIC=${kafka_topic}
+          KAFKA_GROUP_ID=${kafka_group_id}
+          RABBITMQ_DEFAULT_USER=${rabbitmq_default_user}
+          RABBITMQ_DEFAULT_PASS=${rabbitmq_default_pass}
+          JWT_ACCESS_SECRET=${jwt_access_secret}
+          JWT_ACCESS_EXPIRE=${jwt_access_expire}
+          JWT_REFRESH_EXPIRE=${jwt_refresh_expire}
+          AES_KEY=${aes_key}
+          ORDER_RPC_TIMEOUT_MS=${order_rpc_timeout_ms}
+          ORDER_KEY_PREFIX=${order_key_prefix}
+          ORDER_PAY_TIMEOUT_MINUTES=${order_pay_timeout_minutes}
+          ORDER_QUEUE_STATUS_TTL_MINUTES=${order_queue_status_ttl_minutes}
+          ORDER_INVENTORY_TTL_HOURS=${order_inventory_ttl_hours}
+          ORDER_PURCHASE_COUNTER_TTL_HOURS=${order_purchase_counter_ttl_hours}
+          ORDER_REFUND_DEADLINE_HOURS=${order_refund_deadline_hours}
+          ORDER_AUTO_CANCEL_INTERVAL_SECONDS=${order_auto_cancel_interval_seconds}
+          ORDER_LOCAL_ASYNC_BUFFER=${order_local_async_buffer}
+          PAY_NOTIFY_SUCCESS_RESULT=${pay_notify_success_result}
+          PAY_MOCK_FORM_TEMPLATE=${pay_mock_form_template}
+          PAYMENT_RPC_TIMEOUT_MS=${payment_rpc_timeout_ms}
+          PAYMENT_KEY_PREFIX=${payment_key_prefix}
+          PAY_NOTIFY_FAILURE_RESULT=${pay_notify_failure_result}
+          PAY_DEFAULT_SCENE=${pay_default_scene}
+          PAY_DEFAULT_CHANNEL=${pay_default_channel}
+          PAY_REFUND_DEADLINE_HOURS=${pay_refund_deadline_hours}
+          LOCK_TTL_SECONDS=${lock_ttl_seconds}
+          LOCK_RETRY_TIMES=${lock_retry_times}
+          LOCK_RETRY_INTERVAL_MILLIS=${lock_retry_interval_millis}
+          STRIPE_SECRET_KEY=${stripe_secret_key}
+          STRIPE_WEBHOOK_SECRET=${stripe_webhook_secret}
+          STRIPE_SUCCESS_URL=${stripe_success_url}
+          STRIPE_CANCEL_URL=${stripe_cancel_url}
+          STRIPE_CURRENCY=${stripe_currency}
+          STRIPE_PAYMENT_METHOD_PRIMARY=${stripe_payment_method_primary}
+          STRIPE_CHECKOUT_EXPIRE_MINUTES=${stripe_checkout_expire_minutes}
+          STRIPE_REQUEST_TIMEOUT_SECONDS=${stripe_request_timeout_seconds}
+          EOF
+
+          echo "DEPLOY_ENV_FILE=$DEPLOY_ENV_FILE" >> "$GITHUB_ENV"
+
+      - name: Validate selected deploy configuration
+        run: |
+          set -euo pipefail
+          COMPOSE_FILE="deploy/docker-compose.prod.yml"
+          if [[ "${DEPLOY_PROFILE}" == "1g" ]]; then
+            COMPOSE_FILE="deploy/docker-compose.1g.yml"
+          fi
+
+          cp "$DEPLOY_ENV_FILE" deploy/.env
+          docker compose --env-file deploy/.env -f "$COMPOSE_FILE" config > /dev/null
+          rm -f deploy/.env
+
       - name: Sync deploy files to VPS
         run: |
           set -euo pipefail
@@ -193,6 +550,16 @@ jobs:
             --exclude '.env' \
             -e "ssh -i ~/.ssh/id_ed25519 -p $PORT" \
             ./deploy/ "$VPS_USER@$VPS_HOST:$DEPLOY_PATH/deploy/"
+
+      - name: Upload deploy env to VPS
+        run: |
+          set -euo pipefail
+          PORT="${VPS_PORT:-22}"
+          DEPLOY_PATH="${VPS_DEPLOY_PATH:-/opt/xiaomaipro}"
+
+          ssh -i ~/.ssh/id_ed25519 -p "$PORT" "$VPS_USER@$VPS_HOST" \
+            "mkdir -p '$DEPLOY_PATH/deploy' && umask 177 && cat > '$DEPLOY_PATH/deploy/.env'" \
+            < "$DEPLOY_ENV_FILE"
 
       - name: Login to Docker Hub on VPS
         run: |

@@ -4,15 +4,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ENV_FILE="$ROOT_DIR/deploy/.env"
-EXAMPLE_ENV_FILE="$ROOT_DIR/deploy/.env.example"
 COMPOSE_FILE="$ROOT_DIR/deploy/docker-compose.1g.yml"
 APP_SERVICES=(proxy gateway user-rpc program-rpc payment-rpc order-rpc etcd postgres redis)
 
 cd "$ROOT_DIR"
 
 if [[ ! -f "$ENV_FILE" ]]; then
-  cp "$EXAMPLE_ENV_FILE" "$ENV_FILE"
-  echo "Created deploy/.env from deploy/.env.example. Update secrets when needed."
+  echo "Missing $ENV_FILE. Generate it in CI or create it from deploy/.env.example before deploying." >&2
+  exit 1
 fi
 
 export APP_IMAGE_TAG="${APP_IMAGE_TAG:-latest}"
