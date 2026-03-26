@@ -1,5 +1,14 @@
 Name: payment.rpc
 ListenOn: 0.0.0.0:8084
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 19084
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: false
+  HealthResponse: ok
 Timeout: ${PAYMENT_RPC_TIMEOUT_MS}
 
 Etcd:

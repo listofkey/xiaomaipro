@@ -1,0 +1,74 @@
+groups:
+  - name: xiaomaipro-service
+    rules:
+      - alert: XiaomaiServiceDown
+        expr: up{job=~"xiaomaipro-.*"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "{{ $labels.service }} metrics endpoint is down"
+          description: "{{ $labels.job }} at {{ $labels.instance }} has not been reachable for more than 2 minutes."
+
+      - alert: XiaomaiDependencyDown
+        expr: min_over_time(xiaomaipro_dependency_up[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.service }} dependency {{ $labels.dependency }} is unavailable"
+          description: "{{ $labels.service }} cannot reach {{ $labels.dependency }} target {{ $labels.target }} for more than 5 minutes."
+
+      - alert: XiaomaiGatewayHigh5xxRate
+        expr: (sum(rate(http_server_requests_code_total{code=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_code_total[5m])), 1)) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway 5xx rate is high"
+          description: "HTTP 5xx responses are above 5% during the last 10 minutes."
+
+      - alert: XiaomaiGatewayHighLatencyP95
+        expr: histogram_quantile(0.95, sum by (le) (rate(http_server_requests_duration_ms_bucket[5m]))) > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Gateway p95 latency is high"
+          description: "Gateway p95 response time has stayed above 1000ms for 10 minutes."
+
+      - alert: XiaomaiRpcHighErrorRate
+        expr: (sum by (job) (rate(rpc_server_requests_code_total{code!="0"}[5m])) / clamp_min(sum by (job) (rate(rpc_server_requests_code_total[5m])), 1)) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{ $labels.job }} gRPC error rate is high"
+          description: "{{ $labels.job }} has a gRPC non-zero code ratio above 5% for 10 minutes."
+
+      - alert: XiaomaiOrderAsyncFailures
+        expr: increase(xiaomaipro_background_job_total{service="order",job=~"kafka_process|local_async_process",result="error"}[10m]) > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Order async processing failures detected"
+          description: "Order background processing has reported one or more async failures in the last 10 minutes."
+
+      - alert: XiaomaiPaymentBusinessFailures
+        expr: increase(xiaomaipro_business_operation_total{service="payment",operation=~"pay_order|trade_check|refund",result=~"error|business_failed"}[10m]) > 3
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Payment business failures are increasing"
+          description: "Payment business failures exceeded 3 in the last 10 minutes."
+
+      - alert: XiaomaiProgramCacheHitRatioLow
+        expr: (sum(rate(xiaomaipro_cache_request_total{service="program",cache="redis",result="hit"}[15m])) / clamp_min(sum(rate(xiaomaipro_cache_request_total{service="program",cache="redis",result=~"hit|miss"}[15m])), 1)) < 0.20
+        for: 15m
+        labels:
+          severity: info
+        annotations:
+          summary: "Program cache hit ratio is low"
+          description: "Program service Redis cache hit ratio has stayed below 20% for 15 minutes."

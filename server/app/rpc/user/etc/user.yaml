@@ -1,5 +1,14 @@
 Name: user.rpc
 ListenOn: 0.0.0.0:8081
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 19081
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: false
+  HealthResponse: ok
 Etcd:
   Hosts:
     - 127.0.0.1:2379

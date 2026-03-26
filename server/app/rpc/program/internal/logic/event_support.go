@@ -12,6 +12,7 @@ import (
 	"server/app/rpc/model"
 	"server/app/rpc/program/internal/svc"
 	"server/app/rpc/program/programpb/programpb"
+	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
@@ -130,28 +131,47 @@ func parseDate(raw string, endExclusive bool) (*time.Time, error) {
 
 func readCache(ctx context.Context, redisClient *redis.Client, key string, dest any) bool {
 	if redisClient == nil {
+		monitoring.RecordCacheRequest("program", "redis", "skip")
 		return false
 	}
 
 	data, err := redisClient.Get(ctx, key).Bytes()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			monitoring.RecordCacheRequest("program", "redis", "miss")
+		} else {
+			monitoring.RecordCacheRequest("program", "redis", "error")
+		}
 		return false
 	}
 
-	return json.Unmarshal(data, dest) == nil
+	if err := json.Unmarshal(data, dest); err != nil {
+		monitoring.RecordCacheRequest("program", "redis", "decode_error")
+		return false
+	}
+
+	monitoring.RecordCacheRequest("program", "redis", "hit")
+	return true
 }
 
 func writeCache(ctx context.Context, redisClient *redis.Client, key string, value any, ttl time.Duration) {
 	if redisClient == nil {
+		monitoring.RecordCacheRequest("program", "redis_write", "skip")
 		return
 	}
 
 	data, err := json.Marshal(value)
 	if err != nil {
+		monitoring.RecordCacheRequest("program", "redis_write", "marshal_error")
 		return
 	}
 
-	_ = redisClient.Set(ctx, key, data, ttl).Err()
+	if err := redisClient.Set(ctx, key, data, ttl).Err(); err != nil {
+		monitoring.RecordCacheRequest("program", "redis_write", "error")
+		return
+	}
+
+	monitoring.RecordCacheRequest("program", "redis_write", "success")
 }
 
 func applyEventFilters(

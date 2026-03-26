@@ -1,5 +1,14 @@
 Name: payment.rpc
 ListenOn: 0.0.0.0:8084
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 19084
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: false
+  HealthResponse: ok
 # Stripe 创建 checkout session 依赖外部网络，显式高于其 45s 请求超时，
 # 避免被 go-zero gRPC server 默认 2s timeout 截断。
 Timeout: 60000

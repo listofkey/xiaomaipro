@@ -6,6 +6,7 @@ import (
 
 	"server/app/rpc/payment/internal/config"
 	"server/app/rpc/payment/internal/pay"
+	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -30,6 +31,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		panic("failed to connect database: " + err.Error())
 	}
+	monitoring.StartDBMonitor("payment", "postgres", db)
 
 	rdb := redis.NewClient(&redis.Options{
 		Addr:     c.RedisConfig.Host,
@@ -41,6 +43,10 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	defer cancel()
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
 		logx.Errorf("redis connect failed: %v", err)
+	}
+	monitoring.InstrumentRedis("payment", c.RedisConfig.Host, rdb)
+	for _, target := range c.Etcd.Hosts {
+		monitoring.StartTCPMonitor("payment", "etcd", target, 0)
 	}
 
 	return &ServiceContext{

@@ -7,6 +7,7 @@ import (
 	"server/app/rpc/dao"
 	"server/app/rpc/order/internal/config"
 	"server/app/rpc/payment/paymentservice"
+	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/segmentio/kafka-go"
@@ -34,6 +35,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		panic("failed to connect database: " + err.Error())
 	}
+	monitoring.StartDBMonitor("order", "postgres", db)
 
 	dao.SetDefault(db)
 	query := dao.Use(db)
@@ -51,6 +53,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	} else {
 		logx.Infof("redis connected: %s", c.RedisConfig.Host)
 	}
+	monitoring.InstrumentRedis("order", c.RedisConfig.Host, rdb)
 
 	applyDefaults(&c)
 	paymentRpc := paymentservice.NewPaymentService(zrpc.MustNewClient(c.PaymentRpc))
@@ -64,6 +67,15 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			Async:        false,
 			Balancer:     &kafka.LeastBytes{},
 		}
+	}
+	for _, target := range c.Etcd.Hosts {
+		monitoring.StartTCPMonitor("order", "etcd", target, 0)
+	}
+	for _, target := range c.PaymentRpc.Etcd.Hosts {
+		monitoring.StartTCPMonitor("order", "etcd", target, 0)
+	}
+	if c.Kafka.Enabled {
+		monitoring.StartKafkaBrokerMonitor("order", c.Kafka.Brokers, 0)
 	}
 
 	return &ServiceContext{
@@ -111,14 +123,25 @@ func applyDefaults(c *config.Config) {
 }
 
 func (s *ServiceContext) PublishOrderMessage(ctx context.Context, payload []byte) error {
+	start := time.Now()
+	topic := s.Config.Kafka.Topic
+	if topic == "" {
+		topic = "local_async"
+	}
+
 	if s.KafkaWriter != nil {
-		return s.KafkaWriter.WriteMessages(ctx, kafka.Message{Value: payload})
+		err := s.KafkaWriter.WriteMessages(ctx, kafka.Message{Value: payload})
+		monitoring.RecordKafkaMessage("order", topic, "produce", monitoring.ResultFromError(err), time.Since(start))
+		return err
 	}
 
 	select {
 	case s.LocalAsyncQueue <- payload:
+		monitoring.RecordKafkaMessage("order", topic, "produce", "success", time.Since(start))
 		return nil
 	case <-ctx.Done():
-		return ctx.Err()
+		err := ctx.Err()
+		monitoring.RecordKafkaMessage("order", topic, "produce", monitoring.ResultFromError(err), time.Since(start))
+		return err
 	}
 }

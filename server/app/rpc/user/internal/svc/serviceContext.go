@@ -7,6 +7,7 @@ import (
 	"server/app/rpc/dao"
 	"server/app/rpc/user/internal/config"
 	"server/app/rpc/user/internal/pkg/encrypt"
+	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -33,6 +34,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	if err != nil {
 		panic("failed to connect database: " + err.Error())
 	}
+	monitoring.StartDBMonitor("user", "postgres", db)
 
 	dao.SetDefault(db)
 	q := dao.Use(db)
@@ -53,7 +55,14 @@ func NewServiceContext(c config.Config) *ServiceContext {
 			rdb = nil
 		} else {
 			logx.Infof("redis connected: %s", c.RedisConfig.Host)
+			monitoring.InstrumentRedis("user", c.RedisConfig.Host, rdb)
 		}
+	}
+	if rdb == nil && c.RedisConfig.Host != "" {
+		monitoring.StartTCPMonitor("user", "redis", c.RedisConfig.Host, 0)
+	}
+	for _, target := range c.Etcd.Hosts {
+		monitoring.StartTCPMonitor("user", "etcd", target, 0)
 	}
 
 	return &ServiceContext{

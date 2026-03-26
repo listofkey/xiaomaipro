@@ -10,15 +10,16 @@ import (
 	"strings"
 	"time"
 
-	"server/app/rpc/model"
-	"server/app/rpc/payment/internal/pay"
-	"server/app/rpc/payment/internal/svc"
-	"server/common"
-	"server/app/rpc/payment/paymentpb"
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+	"server/app/rpc/model"
+	"server/app/rpc/payment/internal/pay"
+	"server/app/rpc/payment/internal/svc"
+	"server/app/rpc/payment/paymentpb"
+	"server/common"
+	"server/pkg/monitoring"
 )
 
 const (
@@ -46,7 +47,7 @@ const (
 	lockNameTradeCheck = "trade_check"
 	lockNameRefund     = "refund"
 
-	timeLayout = "2006-01-02 15:04:05"
+	timeLayout             = "2006-01-02 15:04:05"
 	refundOperationTimeout = 2 * time.Minute
 )
 
@@ -72,6 +73,12 @@ func NewPaymentCore(ctx context.Context, svcCtx *svc.ServiceContext) *PaymentCor
 }
 
 func (l *PaymentCore) PayOrder(in *paymentpb.PayOrderReq) (*paymentpb.PayOrderResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("payment", "pay_order", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -153,16 +160,28 @@ func (l *PaymentCore) PayOrder(in *paymentpb.PayOrderReq) (*paymentpb.PayOrderRe
 	if err != nil {
 		return nil, err
 	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
+	}
 
 	return resp, nil
 }
 
 func (l *PaymentCore) Notify(in *paymentpb.NotifyReq) (*paymentpb.NotifyResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("payment", "notify", result, time.Since(start))
+	}()
+
 	resp := &paymentpb.NotifyResp{
 		Success: false,
 		AckText: l.svcCtx.Config.Pay.NotifyFailureResult,
 	}
 	if in == nil {
+		result = "business_failed"
 		return resp, nil
 	}
 
@@ -181,11 +200,13 @@ func (l *PaymentCore) Notify(in *paymentpb.NotifyReq) (*paymentpb.NotifyResp, er
 		return nil, err
 	}
 	if notifyResult == nil {
+		result = "ignored"
 		return resp, nil
 	}
 	if !notifyResult.Handled {
 		resp.Success = true
 		resp.AckText = l.svcCtx.Config.Pay.NotifySuccessResult
+		result = "success"
 		return resp, nil
 	}
 
@@ -193,6 +214,7 @@ func (l *PaymentCore) Notify(in *paymentpb.NotifyReq) (*paymentpb.NotifyResp, er
 	if paymentNo == "" {
 		resp.Success = true
 		resp.AckText = l.svcCtx.Config.Pay.NotifySuccessResult
+		result = "success"
 		return resp, nil
 	}
 
@@ -325,11 +347,22 @@ func (l *PaymentCore) Notify(in *paymentpb.NotifyReq) (*paymentpb.NotifyResp, er
 	if err != nil {
 		return nil, err
 	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
+	}
 
 	return resp, nil
 }
 
 func (l *PaymentCore) TradeCheck(in *paymentpb.TradeCheckReq) (*paymentpb.TradeCheckResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("payment", "trade_check", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -499,11 +532,22 @@ func (l *PaymentCore) TradeCheck(in *paymentpb.TradeCheckReq) (*paymentpb.TradeC
 	if err != nil {
 		return nil, err
 	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
+	}
 
 	return resp, nil
 }
 
 func (l *PaymentCore) Refund(in *paymentpb.RefundReq) (*paymentpb.RefundResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("payment", "refund", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -581,6 +625,11 @@ func (l *PaymentCore) Refund(in *paymentpb.RefundReq) (*paymentpb.RefundResp, er
 	})
 	if err != nil {
 		return nil, err
+	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
 	}
 
 	return resp, nil

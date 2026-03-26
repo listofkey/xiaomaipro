@@ -1,5 +1,14 @@
 Name: order.rpc
 ListenOn: 0.0.0.0:8083
+DevServer:
+  Enabled: true
+  Host: 0.0.0.0
+  Port: 19083
+  MetricsPath: /metrics
+  HealthPath: /healthz
+  EnableMetrics: true
+  EnablePprof: false
+  HealthResponse: ok
 Timeout: ${ORDER_RPC_TIMEOUT_MS}
 
 Etcd:

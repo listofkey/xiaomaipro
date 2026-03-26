@@ -8,6 +8,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"server/pkg/monitoring"
+
 	"github.com/gorilla/websocket"
 )
 
@@ -16,6 +18,7 @@ const writeWait = 5 * time.Second
 type Hub struct {
 	upgrader websocket.Upgrader
 
+	service string
 	mu      sync.RWMutex
 	clients map[*client]struct{}
 }
@@ -27,7 +30,12 @@ type client struct {
 }
 
 func NewHub() *Hub {
-	return &Hub{
+	return NewHubWithService("gateway")
+}
+
+func NewHubWithService(service string) *Hub {
+	hub := &Hub{
+		service: service,
 		upgrader: websocket.Upgrader{
 			ReadBufferSize:  1024,
 			WriteBufferSize: 1024,
@@ -37,6 +45,23 @@ func NewHub() *Hub {
 		},
 		clients: make(map[*client]struct{}),
 	}
+	monitoring.SetWebsocketConnections(hub.service, 0)
+
+	return hub
+}
+
+func (h *Hub) ServiceName() string {
+	if h == nil {
+		return "gateway"
+	}
+	if h.service == "" {
+		return "gateway"
+	}
+	return h.service
+}
+
+func (h *Hub) updateConnectionGauge() {
+	monitoring.SetWebsocketConnections(h.ServiceName(), h.ClientCount())
 }
 
 func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -56,18 +81,23 @@ func (h *Hub) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		if _, _, err := conn.ReadMessage(); err != nil {
+			monitoring.RecordWebsocketMessage(h.ServiceName(), "inbound", "error")
 			return
 		}
+		monitoring.RecordWebsocketMessage(h.ServiceName(), "inbound", "success")
 	}
 }
 
 func (h *Hub) BroadcastJSON(payload any) error {
 	data, err := json.Marshal(payload)
 	if err != nil {
+		monitoring.RecordWebsocketMessage(h.ServiceName(), "outbound", "error")
 		return err
 	}
 
-	return h.broadcast(websocket.TextMessage, data)
+	err = h.broadcast(websocket.TextMessage, data)
+	monitoring.RecordWebsocketMessage(h.ServiceName(), "outbound", monitoring.ResultFromError(err))
+	return err
 }
 
 func (h *Hub) ClientCount() int {
@@ -89,6 +119,7 @@ func (h *Hub) Close() error {
 	h.mu.Lock()
 	h.clients = make(map[*client]struct{})
 	h.mu.Unlock()
+	h.updateConnectionGauge()
 
 	return errors.Join(errs...)
 }
@@ -109,9 +140,9 @@ func (h *Hub) broadcast(messageType int, payload []byte) error {
 
 func (h *Hub) addClient(client *client) {
 	h.mu.Lock()
-	defer h.mu.Unlock()
-
 	h.clients[client] = struct{}{}
+	h.mu.Unlock()
+	h.updateConnectionGauge()
 }
 
 func (h *Hub) removeClient(client *client) {
@@ -119,6 +150,7 @@ func (h *Hub) removeClient(client *client) {
 	delete(h.clients, client)
 	h.mu.Unlock()
 
+	h.updateConnectionGauge()
 	_ = client.close()
 }
 

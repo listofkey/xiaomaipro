@@ -14,6 +14,7 @@ import (
 	"server/app/rpc/order/orderpb"
 	"server/app/rpc/payment/paymentservice"
 	"server/common"
+	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -300,6 +301,12 @@ func (l *OrderCore) PreheatInventory(in *orderpb.PreheatInventoryReq) (*orderpb.
 }
 
 func (l *OrderCore) CreateOrder(in *orderpb.CreateOrderReq) (*orderpb.CreateOrderResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("order", "create_order", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -324,6 +331,7 @@ func (l *OrderCore) CreateOrder(in *orderpb.CreateOrderReq) (*orderpb.CreateOrde
 
 	if !created {
 		state, _ := l.readQueueState(orderNo)
+		result = "success"
 		return &orderpb.CreateOrderResp{
 			OrderNo:     orderNo,
 			QueueToken:  orderNo,
@@ -372,6 +380,7 @@ func (l *OrderCore) CreateOrder(in *orderpb.CreateOrderReq) (*orderpb.CreateOrde
 		return nil, err
 	}
 
+	result = "success"
 	return &orderpb.CreateOrderResp{
 		OrderNo:     orderNo,
 		QueueToken:  orderNo,
@@ -436,6 +445,12 @@ func (l *OrderCore) GetQueueStatus(in *orderpb.GetQueueStatusReq) (*orderpb.GetQ
 }
 
 func (l *OrderCore) PayOrder(in *orderpb.PayOrderReq) (*orderpb.PayOrderResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("order", "pay_order", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -500,7 +515,7 @@ func (l *OrderCore) PayOrder(in *orderpb.PayOrderReq) (*orderpb.PayOrderResp, er
 		return nil, err
 	}
 
-	return &orderpb.PayOrderResp{
+	resp := &orderpb.PayOrderResp{
 		Success:           payResp.Success,
 		PayForm:           payResp.PayForm,
 		Payment:           mapPaymentServiceInfo(payResp.Payment),
@@ -509,7 +524,14 @@ func (l *OrderCore) PayOrder(in *orderpb.PayOrderReq) (*orderpb.PayOrderResp, er
 		CheckoutUrl:       payResp.CheckoutUrl,
 		CheckoutSessionId: payResp.CheckoutSessionId,
 		SessionExpiresAt:  payResp.SessionExpiresAt,
-	}, nil
+	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
+	}
+
+	return resp, nil
 }
 
 func (l *OrderCore) CancelOrder(in *orderpb.CancelOrderReq) (*orderpb.CancelOrderResp, error) {
@@ -539,6 +561,12 @@ func (l *OrderCore) CancelOrder(in *orderpb.CancelOrderReq) (*orderpb.CancelOrde
 }
 
 func (l *OrderCore) ApplyRefund(in *orderpb.ApplyRefundReq) (*orderpb.ApplyRefundResp, error) {
+	start := time.Now()
+	result := "error"
+	defer func() {
+		monitoring.RecordOperation("order", "apply_refund", result, time.Since(start))
+	}()
+
 	if in == nil {
 		return nil, errors.New("request is empty")
 	}
@@ -574,11 +602,18 @@ func (l *OrderCore) ApplyRefund(in *orderpb.ApplyRefundReq) (*orderpb.ApplyRefun
 		_ = l.releaseInventoryAndQuota(order.EventID, order.TicketTierID, order.UserID, order.Quantity)
 	}
 
-	return &orderpb.ApplyRefundResp{
+	resp := &orderpb.ApplyRefundResp{
 		Success: refundResp.Success,
 		OrderNo: orderNo,
 		Refund:  mapPaymentServiceRefund(refundResp.Refund),
-	}, nil
+	}
+	if resp.Success {
+		result = "success"
+	} else {
+		result = "business_failed"
+	}
+
+	return resp, nil
 }
 
 func (l *OrderCore) ListOrder(in *orderpb.ListOrderReq) (*orderpb.ListOrderResp, error) {

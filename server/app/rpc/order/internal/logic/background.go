@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"server/app/rpc/order/internal/svc"
+	"server/pkg/monitoring"
 
 	"github.com/segmentio/kafka-go"
 	"github.com/zeromicro/go-zero/core/logx"
@@ -35,15 +36,21 @@ func consumeKafkaLoop(svcCtx *svc.ServiceContext) {
 	defer reader.Close()
 
 	for {
+		start := time.Now()
 		msg, err := reader.ReadMessage(context.Background())
 		if err != nil {
+			monitoring.RecordBackgroundJob("order", "kafka_read", "error", time.Since(start))
 			logx.Errorf("order kafka consume failed: %v", err)
 			time.Sleep(time.Second)
 			continue
 		}
 
 		core := NewOrderCore(context.Background(), svcCtx)
-		if err := core.processQueuedOrderMessage(msg.Value); err != nil {
+		processStart := time.Now()
+		err = core.processQueuedOrderMessage(msg.Value)
+		monitoring.RecordKafkaMessage("order", svcCtx.Config.Kafka.Topic, "consume", monitoring.ResultFromError(err), time.Since(processStart))
+		monitoring.RecordBackgroundJob("order", "kafka_process", monitoring.ResultFromError(err), time.Since(processStart))
+		if err != nil {
 			logx.Errorf("order kafka process failed: %v", err)
 		}
 	}
@@ -52,7 +59,11 @@ func consumeKafkaLoop(svcCtx *svc.ServiceContext) {
 func consumeLocalLoop(svcCtx *svc.ServiceContext) {
 	for payload := range svcCtx.LocalAsyncQueue {
 		core := NewOrderCore(context.Background(), svcCtx)
-		if err := core.processQueuedOrderMessage(payload); err != nil {
+		start := time.Now()
+		err := core.processQueuedOrderMessage(payload)
+		monitoring.RecordKafkaMessage("order", "local_async", "consume", monitoring.ResultFromError(err), time.Since(start))
+		monitoring.RecordBackgroundJob("order", "local_async_process", monitoring.ResultFromError(err), time.Since(start))
+		if err != nil {
 			logx.Errorf("order local async process failed: %v", err)
 		}
 	}
@@ -69,7 +80,9 @@ func autoCancelLoop(svcCtx *svc.ServiceContext) {
 
 	for range ticker.C {
 		core := NewOrderCore(context.Background(), svcCtx)
+		start := time.Now()
 		count, err := core.expirePendingOrders(100)
+		monitoring.RecordBackgroundJob("order", "expire_pending_orders", monitoring.ResultFromError(err), time.Since(start))
 		if err != nil {
 			logx.Errorf("expire pending orders failed: %v", err)
 			continue

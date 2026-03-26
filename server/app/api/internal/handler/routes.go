@@ -124,4 +124,5 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	registerProgramRoutes(server, serverCtx)
 	registerOrderRoutes(server, serverCtx, authMiddleware.Handle)
 	registerPaymentRoutes(server, serverCtx, authMiddleware.Handle)
+	RegisterWebsocketRoutes(server, serverCtx)
 }
