@@ -9,6 +9,18 @@ DevServer:
   EnableMetrics: true
   EnablePprof: false
   HealthResponse: ok
+Logging:
+  Level: info
+  Encoding: json
+  Console: true
+  Directory: logs
+  Filename: order-rpc.log
+  Logstash:
+    Enabled: true
+    Network: tcp
+    Address: 127.0.0.1:5001
+    ConnectTimeoutSeconds: 3
+    WriteTimeoutSeconds: 3
 # PayOrder/Refund 会串联 DB、锁和 payment.rpc，显式放宽服务端超时，
 # 避免 go-zero 的默认 2s timeout 在第三方支付链路上提前触发。
 Timeout: 70000

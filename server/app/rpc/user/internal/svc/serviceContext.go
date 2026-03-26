@@ -7,13 +7,13 @@ import (
 	"server/app/rpc/dao"
 	"server/app/rpc/user/internal/config"
 	"server/app/rpc/user/internal/pkg/encrypt"
+	"server/pkg/logging"
 	"server/pkg/monitoring"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/zeromicro/go-zero/core/logx"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
 )
 
 type ServiceContext struct {
@@ -29,7 +29,7 @@ func NewServiceContext(c config.Config) *ServiceContext {
 	}
 
 	db, err := gorm.Open(postgres.Open(c.DB.DSN), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: logging.NewGormLogger("gorm"),
 	})
 	if err != nil {
 		panic("failed to connect database: " + err.Error())

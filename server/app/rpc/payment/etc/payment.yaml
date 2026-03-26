@@ -9,6 +9,18 @@ DevServer:
   EnableMetrics: true
   EnablePprof: false
   HealthResponse: ok
+Logging:
+  Level: info
+  Encoding: json
+  Console: true
+  Directory: logs
+  Filename: payment-rpc.log
+  Logstash:
+    Enabled: true
+    Network: tcp
+    Address: 127.0.0.1:5001
+    ConnectTimeoutSeconds: 3
+    WriteTimeoutSeconds: 3
 # Stripe 创建 checkout session 依赖外部网络，显式高于其 45s 请求超时，
 # 避免被 go-zero gRPC server 默认 2s timeout 截断。
 Timeout: 60000

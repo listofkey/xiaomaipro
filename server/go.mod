@@ -12,6 +12,7 @@ require (
 	github.com/smartwalle/alipay/v3 v3.2.29
 	github.com/stripe/stripe-go/v84 v84.4.1
 	github.com/zeromicro/go-zero v1.10.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.48.0
 	google.golang.org/grpc v1.79.1
 	google.golang.org/protobuf v1.36.11
@@ -90,7 +91,6 @@ require (
 	go.uber.org/automaxprocs v1.6.0 // indirect
 	go.uber.org/mock v0.6.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
-	go.uber.org/zap v1.24.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.50.0 // indirect

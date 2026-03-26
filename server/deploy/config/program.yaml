@@ -9,6 +9,18 @@ DevServer:
   EnableMetrics: true
   EnablePprof: false
   HealthResponse: ok
+Logging:
+  Level: info
+  Encoding: json
+  Console: true
+  Directory: logs
+  Filename: program-rpc.log
+  Logstash:
+    Enabled: true
+    Network: tcp
+    Address: "host.docker.internal:5001"
+    ConnectTimeoutSeconds: 3
+    WriteTimeoutSeconds: 3
 
 Etcd:
   Hosts:

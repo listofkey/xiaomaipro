@@ -4,6 +4,8 @@ x-backend-service: &backend-service
   restart: unless-stopped
   env_file:
     - ./.env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
   networks:
     - xiaomai-net
 
