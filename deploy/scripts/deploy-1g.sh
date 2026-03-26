@@ -9,7 +9,7 @@ POSTGRES_BOOTSTRAP_SCRIPT="$ROOT_DIR/deploy/scripts/bootstrap-postgres.sh"
 POSTGRES_INIT_DIR="$ROOT_DIR/deploy/postgres/init"
 POSTGRES_INIT_SQL="$POSTGRES_INIT_DIR/001-public.sql"
 SEED_FILE="$ROOT_DIR/deploy/public.sql"
-APP_SERVICES=(proxy gateway user-rpc program-rpc payment-rpc order-rpc etcd postgres redis)
+PULL_SERVICES=(proxy gateway user-rpc program-rpc payment-rpc order-rpc)
 INFRA_SERVICES=(etcd postgres redis)
 CORE_APP_SERVICES=(gateway user-rpc program-rpc payment-rpc order-rpc proxy)
 
@@ -36,7 +36,7 @@ fi
 
 echo "Deploying 1G profile from ${DOCKERHUB_NAMESPACE:-deploy/.env} with tag ${APP_IMAGE_TAG}"
 
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull "${APP_SERVICES[@]}"
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" pull "${PULL_SERVICES[@]}"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans "${INFRA_SERVICES[@]}"
 bash "$POSTGRES_BOOTSTRAP_SCRIPT"
 docker compose --env-file "$ENV_FILE" -f "$COMPOSE_FILE" up -d --remove-orphans "${CORE_APP_SERVICES[@]}"
