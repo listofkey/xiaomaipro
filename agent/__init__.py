@@ -1,0 +1,2 @@
+"""Ticketing Copilot agent package."""
+
